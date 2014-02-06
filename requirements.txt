@@ -2,6 +2,10 @@ Flask-MongoKit
 Flask-WTF
 gunicorn
 redis
+hiredis
+numexpr
+cython
+tables
 rq
 rq-dashboard
 boto

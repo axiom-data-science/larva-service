@@ -11,6 +11,7 @@ import time
         secret_key = your_secret_key
         mongo_db = mongodb://localhost:27017/larvaservice_production
         redis_db = redis://localhost:6379/0
+        results_redis_db = redis://localhost:6379/0
         webuser = www-data ('nginx' for RedHat based distros)
 
         use_s3 = False

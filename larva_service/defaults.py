@@ -35,3 +35,6 @@ REDIS_PORT = url.port
 REDIS_USERNAME = url.username
 REDIS_PASSWORD = url.password
 REDIS_DB = url.path[1:]
+
+# Redis Results
+RESULTS_REDIS_URI = os.environ.get('RESULTS_REDIS_URI')

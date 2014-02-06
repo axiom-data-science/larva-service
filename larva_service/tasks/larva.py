@@ -1,23 +1,17 @@
 from larva_service import app, db, slugify
 from flask import current_app
 from shapely.wkt import loads
+import json
 import tempfile
 import pytz
 import math
+import sys
 import os
 import shutil
 import multiprocessing
 import logging
 from datetime import datetime
-from urlparse import urljoin
-
-PROGRESS = 15
-logging.PROGRESS = PROGRESS
-logging.addLevelName(PROGRESS, 'PROGRESS')
-def progress(self, message, *args, **kwargs):
-    if self.isEnabledFor(PROGRESS):
-        self._log(PROGRESS, message, args, **kwargs)
-logging.Logger.progress = progress
+from urlparse import urljoin, urlparse
 
 import threading
 import collections
@@ -26,7 +20,7 @@ from paegan.transport.models.behavior import LarvaBehavior
 from paegan.transport.models.transport import Transport
 from paegan.transport.model_controller import ModelController
 
-from paegan.logger.multi_process_logging import MultiProcessingLogHandler
+from logging import FileHandler
 from paegan.logger.progress_handler import ProgressHandler
 
 from boto.s3.connection import S3Connection
@@ -38,14 +32,14 @@ from rq import get_current_job
 
 import time
 
+import redis
+
+from larva_service.models.run import ResultsPyTable
+
 
 def run(run_id):
 
-    # Sleep to give the Run object enough time to save
-    time.sleep(10)
-
     with app.app_context():
-        from paegan.logger import logger
 
         job = get_current_job()
 
@@ -57,64 +51,81 @@ def run(run_id):
         shutil.rmtree(cache_path, ignore_errors=True)
         os.makedirs(cache_path)
 
-        temp_animation_path = os.path.join(current_app.config['OUTPUT_PATH'], "temp_images_" + run_id)
-        shutil.rmtree(temp_animation_path, ignore_errors=True)
-        os.makedirs(temp_animation_path)
-
-        # Set up Logger
-        queue = multiprocessing.Queue(-1)
-
         f, log_file = tempfile.mkstemp(dir=cache_path, prefix=run_id, suffix=".log")
         os.close(f)
 
-        # Close any existing handlers
-        (hand.close() for hand in logger.handlers)
-        # Remove any existing handlers
-        logger.handlers = []
-        logger.setLevel(logging.PROGRESS)
-        handler = MultiProcessingLogHandler(log_file, queue)
-        handler.setLevel(logging.PROGRESS)
+        # Set up Logger
+        logger = logging.getLogger(run_id)
+        handler = FileHandler(log_file)
+        handler.setLevel(logging.INFO)
         formatter = logging.Formatter('[%(asctime)s] - %(levelname)s - %(name)s - %(processName)s - %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-        # Progress stuff.  Hokey!
-        progress_deque = collections.deque(maxlen=1)
-        progress_handler = ProgressHandler(progress_deque)
-        progress_handler.setLevel(logging.PROGRESS)
-        logger.addHandler(progress_handler)
+        res = urlparse(current_app.config.get("RESULTS_REDIS_URI"))
+        redis_pool = redis.ConnectionPool(host=res.hostname, port=res.port, db=res.path[1:])
+        r = redis.Redis(connection_pool=redis_pool)
 
-        e = threading.Event()
+        def listen_for_logs():
+            pubsub = r.pubsub()
+            pubsub.subscribe("%s:log" % run_id)
+            for msg in pubsub.listen():
+                if msg['type'] != "message":
+                    continue
 
-        def save_progress():
-            while e.wait(5) is not True:
-                try:
-                    record = progress_deque.pop()
-                    if record == StopIteration:
-                        break
+                if msg["data"] == "FINISHED":
+                    break
 
-                    job.meta["updated"] = record[0]
-                    if record is not None and record[1] >= 0:
-                        job.meta["progress"] = record[1]
-                    if isinstance(record[2], unicode) or isinstance(record[2], str):
-                        job.meta["message"] = record[2]
+                prog = json.loads(msg["data"])
+                if prog is not None:
+                    if prog.get("level", "").lower() == "progress":
+                        job.meta["progress"] = prog.get("value", job.meta.get("progress", None))
+                        job.meta["message"]  = prog.get("message", job.meta.get("message", ""))
+                        job.meta["updated"]  = prog.get("time", datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.utc))
+                        job.save()
+                        logger.info("PROGRESS: %(value)d - %(message)s" % prog)
+                    else:
+                        getattr(logger, prog["level"].lower())(prog.get("message"))
 
-                    job.save()
-                except IndexError:
-                    pass
-                except Exception:
-                    raise
-            return
+            pubsub.close()
+            sys.exit()
 
-        t = threading.Thread(name="ProgressUpdater", target=save_progress)
-        t.daemon = True
-        t.start()
+        def listen_for_results():
+            # Create output file (hdf5)
+            results = ResultsPyTable(os.path.join(output_path, "results.h5"))
+            pubsub = r.pubsub()
+            pubsub.subscribe("%s:results" % run_id)
+            for msg in pubsub.listen():
+                if msg['type'] != "message":
+                    continue
+
+                if msg["data"] == "FINISHED":
+                    break
+
+                # Write to HDF file
+                results.write(json.loads(msg["data"]))
+
+            pubsub.close()
+            results.compute()
+            results.close()
+            sys.exit()
+
+        pl = threading.Thread(name="LogListener", target=listen_for_logs)
+        pl.daemon = True
+        pl.start()
+
+        rl = threading.Thread(name="ResultListener", target=listen_for_results)
+        rl.daemon = True
+        rl.start()
+
+        # Wait for PubSub listening to begin
+        time.sleep(1)
 
         model = None
-
         try:
 
-            logger.progress((0, "Configuring model"))
+            #logger.progress((0, "Configuring model"))
+            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 0, "message" : "Configuring model"}))
 
             run = db.Run.find_one( { '_id' : ObjectId(run_id) } )
             if run is None:
@@ -128,9 +139,6 @@ def run(run_id):
             start_time     = run['start'].replace(tzinfo = pytz.utc)
             shoreline_path = run['shoreline_path'] or app.config.get("SHORE_PATH")
             shoreline_feat = run['shoreline_feature']
-
-            # Set up output directory/bucket for run
-            output_formats = ['Shapefile', 'NetCDF', 'Trackline']
 
             # Setup Models
             models = []
@@ -148,24 +156,8 @@ def run(run_id):
             cache_file = os.path.join(cache_path, run_id + ".nc.cache")
             bathy_file = current_app.config['BATHY_PATH']
 
-            model.run(run['hydro_path'], output_path=output_path, bathy=bathy_file, output_formats=output_formats, cache=cache_file, remove_cache=False, caching=run['caching'])
+            model.run(run['hydro_path'], output_formats=["redis", "trackline"], output_path=output_path, redis_url=current_app.config.get("RESULTS_REDIS_URI"), redis_results_channel="%s:results" % run_id, redis_log_channel="%s:log" % run_id, bathy=bathy_file, cache=cache_file, remove_cache=False, caching=run['caching'])
 
-            # Skip creating movie output_path
-            """
-            from paegan.viz.trajectory import CFTrajectory
-
-            logger.info("Creating animation...")
-            for filename in os.listdir(output_path):
-                if os.path.splitext(filename)[1][1:] == "nc":
-                    # Found netCDF file
-                    netcdf_file = os.path.join(output_path,filename)
-                    traj = CFTrajectory(netcdf_file)
-                    success = traj.plot_animate(os.path.join(output_path,'animation.avi'), temp_folder=temp_animation_path, bathy=app.config['BATHY_PATH'])
-                    if not success:
-                        logger.info("Could not create animation")
-                    else:
-                        logger.info("Animation saved")
-            """
             job.meta["outcome"] = "success"
             job.save()
             return "Successfully ran %s" % run_id
@@ -179,13 +171,29 @@ def run(run_id):
 
         finally:
 
-            logger.progress((99, "Processing output files"))
-            # Close the handler so we can upload the log file without a file lock
-            (hand.close() for hand in logger.handlers)
-            queue.put(StopIteration)
-            # Break out of the progress loop
-            e.set()
-            t.join()
+            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 99, "message" : "Processing output files and cleaning up"}))
+
+            # Add a finished to the end.
+            r.publish("%s:log" % run_id, "FINISHED")
+            r.publish("%s:results" % run_id, "FINISHED")
+            # Wait for results to be written
+            pl.join()
+            rl.join()
+            # Remove all connections
+            redis_pool.disconnect()
+
+            # Close and remove the handlers so we can use the log file without a file lock
+            for hand in list(logger.handlers):
+                logger.removeHandler(hand)
+                hand.flush()
+                hand.close()
+                del hand
+
+            # LOOK: Without this, the destination log file (mode.log) is left
+            # with an open file handler.  I'm baffled and can't figure out why.
+            # Try removing this and running `lsof` on the output directory.
+            # Yeah.  Mind Blown.
+            time.sleep(1)
 
             # Move logfile to output directory
             shutil.move(log_file, os.path.join(output_path, 'model.log'))
@@ -230,21 +238,13 @@ def run(run_id):
                 for outfile in output_files:
                     result_files.append(urljoin(base_access_url, run_id) + "/" + os.path.basename(outfile))
 
-            shutil.rmtree(temp_animation_path, ignore_errors=True)
-
             # Set output fields
             run.output = result_files
             run.ended = datetime.utcnow()
             run.compute()
             run.save()
 
-            # Cleanup
-            logger.removeHandler(handler)
-            del formatter
-            del handler
-            del logger
             del model
-            queue.close()
 
             job.meta["message"] = "Complete"
             job.save()

@@ -11,26 +11,29 @@ Assumes you have:
 
 ### Create an .env file with the following contents
     APPLICATION_SETTINGS=development.py
-    SECRET_KEY='supersecretkeysupersuper'
-    # Omit this to disable logging to a file.
-    # Setting it to any value will enable logging to a file.
-    LOG_FILE=yes
+    SECRET_KEY='yoursupersercetkey'
+
     MONGO_URI="mongodb://localhost:27017/larvaservice_development"
     REDIS_URI="redis://localhost:6379/0"
-    # AWS account to upload results to
-    AWS_ACCESS_KEY_ID=KEY
-    AWS_SECRET_ACCESS_KEY=SECRET
-    WEB_PASSWORD=WHATEVER_YOU_WANT
 
-### Edit the .env file
-    With your endpoints/passwords/whatevs
+    WEB_PASSWORD=yourdesiredwebpass
 
-### Edit development.py and testing.py 
-    With paths to the following:
-    BATHY_PATH = "somewhere/ETOPO1_Bed_g_gmt4.grd"
-    CACHE_PATH = "folder/somewhere"
-    OUTPUT_PATH = "folder/somewhere"
-    SHORE_PATH = "somewhere/New_Land_Clean.shp"
+    # Should we upload results to S3?  If so, all four are required
+    USE_S3=True
+    S3_BUCKET=yourbucket
+    AWS_ACCESS_KEY_ID=your_access_key
+    AWS_SECRET_ACCESS_KEY=your_secret_key
+
+    # If not using S3, provide root URL to download results
+    USE_S3=False
+    NON_S3_OUTPUT_URL="http://localhost/lmfiles/"
+
+    BATHY_PATH="PATH_TO_BATHY" (see README.md for download link)
+    OUTPUT_PATH="/data/larvamap/output" (optional, defaults to "./output")
+    CACHE_PATH="/tmp/cache" (optional, defaults to "./cache")
+    SHORE_PATH="/data/lm/shore/global/10m_land.shp" (optional, defaults to global 10m polygons)
+
+### Edit testing.py is you will be running the tests
 
 ### Start the local server
     $ foreman start

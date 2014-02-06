@@ -233,3 +233,57 @@ class Run(Document):
 
 
 db.register([Run])
+
+
+from tables import *
+# Pytables representation of a model run
+class ModelResultsTable(IsDescription):
+    particle    = UInt8Col()
+    time        = Time32Col()
+    latitude    = Float32Col()
+    longitude   = Float32Col()
+    depth       = Float32Col()
+    u_vector    = Float32Col()
+    v_vector    = Float32Col()
+    w_vector    = Float32Col()
+    temperature = Float32Col()
+    salinity    = Float32Col()
+    age         = Float32Col()
+    lifestage   = UInt8Col()
+    progress    = Float32Col()
+    settled     = BoolCol()
+    halted      = BoolCol()
+    dead        = BoolCol()
+
+
+class ResultsPyTable(object):
+    def __init__(self, output_file):
+        self._file  = open_file(output_file, mode="w", title="Model run output")
+        self._root  = self._file.create_group("/", "trajectories", "Trajectory Data")
+        self._table = self._file.create_table(self._root, "model_results", ModelResultsTable, "Model Results")
+
+    def write(self, data):
+        record = self._table.row
+        for k, v in data.iteritems():
+            try:
+                record[k] = v
+            except Exception, e:
+                raise
+                # No column named "k", so don't add the data
+                pass
+
+        record.append()
+
+    def trackline(self):
+        pass
+
+    def metadata(self):
+        pass
+
+    def compute(self):
+        self.trackline()
+        self.metadata()
+
+    def close(self):
+        self._table.flush()
+        self._file.close()
