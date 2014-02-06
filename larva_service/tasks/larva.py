@@ -208,7 +208,6 @@ def run(run_id):
                 output_files.append(outfile)
 
             result_files = []
-            base_access_url = current_app.config.get('NON_S3_OUTPUT_URL', None)
             # Handle results and cleanup
             if current_app.config['USE_S3'] is True:
                 base_access_url = urljoin("http://%s.s3.amazonaws.com/output/" % current_app.config['S3_BUCKET'], run_id)
@@ -235,8 +234,7 @@ def run(run_id):
                 shutil.rmtree(output_path, ignore_errors=True)
 
             else:
-                for outfile in output_files:
-                    result_files.append(urljoin(base_access_url, run_id) + "/" + os.path.basename(outfile))
+                result_files = output_files
 
             # Set output fields
             run.output = result_files

@@ -1,4 +1,7 @@
-from flask import render_template, redirect, url_for, request, flash, jsonify
+import os
+import io
+
+from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, abort
 from larva_service import app, db, run_queue
 from larva_service.models.run import Run
 from larva_service.tasks.larva import run as larva_run
@@ -141,3 +144,15 @@ def status_run(run_id, format=None):
 def run_config(run_id):
     run = db.Run.find_one( { '_id' : run_id } )
     return jsonify( run.run_config() )
+
+
+@app.route("/runs/<ObjectId:run_id>/output/<string:filename>", methods=['GET'])
+def run_output_download(run_id, filename):
+    # Avoid being able to download ".." and "/"
+    if '..' in filename or filename.startswith('/'):
+        abort(404)
+
+    run = db.Run.find_one( { '_id' : run_id } )
+    for f in run.output:
+        if os.path.basename(f) == filename:
+            return send_file(f)

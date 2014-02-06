@@ -1,5 +1,6 @@
 from mongokit import Document, DocumentMigration
 from larva_service import db, app, redis_connection
+from flask import url_for
 from datetime import datetime
 from dateutil.parser import parse as dateparse
 import json
@@ -157,9 +158,27 @@ class Run(Document):
 
         return marker_positions
 
-    def get_file_key_and_path(self, file_path):
-        path = urlparse(file_path).path
-        name, ext = os.path.splitext(path)
+    def get_file_key_and_link(self, file_path):
+        url = urlparse(file_path)
+        if url.scheme == '':
+            base_access_url = app.config.get('NON_S3_OUTPUT_URL', None)
+            if base_access_url is None:
+                # Serve assets through Flask... not desired!
+                app.logger.warning("Serving static output through Flask is not desirable! Set the NON_S3_OUTPUT_URL config variable.")
+
+                filename = url.path.split("/")[-1]
+                # We can get a context here to use url_for
+                with app.app_context():
+                    file_link = url_for("run_output_download", run_id=self._id, filename=filename)
+            else:
+                file_link = base_access_url + file_path.replace(app.config.get("OUTPUT_PATH"), "")
+
+        else:
+            file_link = file_path
+
+            # Local file
+        url = urlparse(file_link)
+        name, ext = os.path.splitext(url.path)
 
         file_type = "Unknown (%s)" % ext
         if ext == ".zip":
@@ -177,10 +196,10 @@ class Run(Document):
         elif ext == ".log":
             file_type = "Logfile"
 
-        return { file_type : file_path }
+        return { file_type : file_link }
 
     def output_files(self):
-        return (self.get_file_key_and_path(file_path) for file_path in self.output)
+        return (self.get_file_key_and_link(file_path) for file_path in self.output)
 
     def run_config(self):
 

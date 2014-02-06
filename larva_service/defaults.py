@@ -11,7 +11,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 
 USE_S3 = os.environ.get('USE_S3', False)
 S3_BUCKET = os.environ.get('S3_BUCKET', "undefined")
-NON_S3_OUTPUT_URL = os.environ.get('NON_S3_OUTPUT_URL', "undefined")
+NON_S3_OUTPUT_URL = os.environ.get('NON_S3_OUTPUT_URL', None)
 
 BATHY_PATH = os.environ.get('BATHY_PATH', "undefined")
 CACHE_PATH = os.environ.get('CACHE_PATH', "undefined")
