@@ -53,6 +53,7 @@ def run(run_id):
 
         f, log_file = tempfile.mkstemp(dir=cache_path, prefix=run_id, suffix=".log")
         os.close(f)
+        os.chmod(log_file, 0644)
 
         # Set up Logger
         logger = logging.getLogger(run_id)
