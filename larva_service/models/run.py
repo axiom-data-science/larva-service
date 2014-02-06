@@ -31,7 +31,7 @@ class RunMigration(DocumentMigration):
         self.target = {'shoreline_path':{'$exists':False}, 'shoreline_feature':{'$exists':False}}
         self.update = {'$set':{'shoreline_path':u'', 'shoreline_feature':u''}}
 
-    def allmigration04__add_caching_field(self):
+    def allmigration05__add_caching_field(self):
         self.target = {'caching' : {'$exists' : False }}
         self.update = {'$set' : {'caching' : True }}
 
