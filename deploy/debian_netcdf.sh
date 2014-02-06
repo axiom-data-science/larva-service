@@ -36,13 +36,21 @@ DOWNLOAD_PATH=/opt/src
 DO_DOWNLOAD=true
 THREADS=10
 
+# For `ldconfig`
+touch /etc/ld.so.conf.d/nco.conf
+
 HDF5_URL="http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.8.12.tar.gz"
 HDF5_PREFIX=$(basename ${HDF5_URL##*/} .tar.gz)
 CONFIG_OPTIONS=""
 download_extract_compile_install "$HDF5_URL" "$DOWNLOAD_PATH" "$DO_DOWNLOAD" "$INSTALL_PATH" "$CONFIG_OPTIONS" "$THREADS"
+echo '$INSTALL_PATH/$HDF5_PREFIX/lib' >> /etc/ld.so.conf.d/nco.conf
 
 NETCDF4_URL="ftp://ftp.unidata.ucar.edu/pub/netcdf/netcdf-4.3.1.tar.gz"
+NETCDF4_PREFIX=$(basename ${NETCDF4_URL##*/} .tar.gz)
 export LDFLAGS="-L/opt/$HDF5_PREFIX/lib"
 export CPPFLAGS="-I/opt/$HDF5_PREFIX/include"
 CONFIG_OPTIONS="--enable-netcdf4 --enable-mmap"
 download_extract_compile_install "$NETCDF4_URL" "$DOWNLOAD_PATH" "$DO_DOWNLOAD" "$INSTALL_PATH" "$CONFIG_OPTIONS" "$THREADS"
+echo '$INSTALL_PATH/$NETCDF4_PREFIX/lib' >> /etc/ld.so.conf.d/nco.conf
+
+ldconfig
