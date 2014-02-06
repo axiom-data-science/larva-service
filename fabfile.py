@@ -29,6 +29,7 @@ import time
 env.user = "larva"
 
 code_dir = "/home/larva/larva-service"
+env["code_dir"] = code_dir
 
 data_snapshot = "snap-94f3cfd7"
 
