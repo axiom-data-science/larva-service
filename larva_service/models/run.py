@@ -195,6 +195,8 @@ class Run(Document):
             file_type = "Animation"
         elif ext == ".log":
             file_type = "Logfile"
+        elif ext == ".h5":
+            file_type = "HDF5"
 
         return { file_type : file_link }
 
@@ -255,6 +257,8 @@ db.register([Run])
 
 
 from tables import *
+
+
 # Pytables representation of a model run
 class ModelResultsTable(IsDescription):
     particle    = UInt8Col()
