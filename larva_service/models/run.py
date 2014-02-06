@@ -291,7 +291,6 @@ class ResultsPyTable(object):
             try:
                 record[k] = v
             except Exception, e:
-                raise
                 # No column named "k", so don't add the data
                 pass
 
@@ -310,3 +309,4 @@ class ResultsPyTable(object):
     def close(self):
         self._table.flush()
         self._file.close()
+
