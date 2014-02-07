@@ -1,6 +1,5 @@
 from fabric.api import *
 from fabric.contrib.files import *
-import os
 from copy import copy
 import time
 
@@ -31,102 +30,105 @@ env.user = "larva"
 code_dir = "/home/larva/larva-service"
 env["code_dir"] = code_dir
 
-data_snapshot = "snap-94f3cfd7"
-
 env.roledefs.update({
     'setup'     : [],
-    'web'       : ['services.larvamap.asascience.com'],
+    'web'       : [],
     'datasets'  : [],
     'shorelines': [],
-    'runs'      : ['ec2-54-227-97-183.compute-1.amazonaws.com'],
-    'workers'   : ['ec2-50-16-20-142.compute-1.amazonaws.com'],
-    'all'       : []
+    'runs'      : [],
+    'workers'   : [],
+    'all'       : ["calcium.axiompvd"]
 })
+
+
 # For copy and pasting when running tasks system wide
 # @roles('web','datasets','shorelines','runs','workers','all')
 
+
 def admin():
-    env.user = "ec2-user"
+    env.user = "axiom"
+
+
 def larva():
     env.user = "larva"
+
 
 @roles('workers')
 @parallel
 def deploy_workers():
     stop_supervisord()
-
     larva()
     with cd(code_dir):
-        run("git pull origin master")
+        update_code()
         update_libs()
         start_supervisord()
         run("supervisorctl -c ~/supervisord.conf start runs")
         run("supervisorctl -c ~/supervisord.conf start datasets")
         run("supervisorctl -c ~/supervisord.conf start shorelines")
+
 
 @roles('runs')
 @parallel
 def deploy_runs():
     stop_supervisord()
-
     larva()
     with cd(code_dir):
-        run("git pull origin master")
+        update_code()
         update_libs()
         start_supervisord()
         run("supervisorctl -c ~/supervisord.conf start runs")
+
 
 @roles('datasets')
 @parallel
 def deploy_datasets():
     stop_supervisord()
-
     larva()
     with cd(code_dir):
-        run("git pull origin master")
+        update_code()
         update_libs()
         start_supervisord()
         run("supervisorctl -c ~/supervisord.conf start datasets")
+
 
 @roles('shorelines')
 @parallel
 def deploy_shorelines():
     stop_supervisord()
-
     larva()
     with cd(code_dir):
-        run("git pull origin master")
+        update_code()
         update_libs()
         start_supervisord()
         run("supervisorctl -c ~/supervisord.conf start shorelines")
+
 
 @roles('web')
 @parallel
 def deploy_web():
     stop_supervisord()
-
     larva()
     with cd(code_dir):
-        run("git pull origin master")
+        update_code()
         update_libs()
         start_supervisord()
         run("supervisorctl -c ~/supervisord.conf start gunicorn")
 
+
 @roles('all')
-@parallel
 def deploy_all():
     stop_supervisord()
-
     larva()
     with cd(code_dir):
-        run("git pull origin master")
+        update_code()
         update_libs()
         start_supervisord()
         run("supervisorctl -c ~/supervisord.conf start all")
 
+
 @roles('setup')
 @parallel
-def setup():
+def setup_cloud_centos():
     # Based on Amazon Linux AMI
     admin()
 
@@ -151,8 +153,14 @@ def setup():
     # Get code
     setup_code()
 
+    # Get NetCDF libraries for RedHat
+    update_netcdf_libraries_rh()
+
+    # Process requirements.txt
+    install_requirements()
+
     # Setup Nginx
-    setup_nginx()
+    execute(setup_nginx)
 
     # Data/Bathy (EBS from snapshot)
     setup_data()
@@ -172,10 +180,42 @@ def setup():
     # Setup supervisord
     update_supervisord()
 
+
+@roles('setup')
+def setup_local_debian():
+     # Based on Debian Wheezy
+    admin()
+
+    # Install additonal packages
+    sudo("apt-get install -y gfortran liblzo2-dev libbz2-dev libblas-dev liblapack-dev curl libgdal-dev libproj-dev libgeos-dev git nginx python2.7 python2.7-dev gcc g++ make libfreetype6-dev libpng-dev libtiff-dev libjpeg-dev")
+
+    # Setup larva user
+    setup_larva_user()
+
+    # Setup the python virtualenv
+    setup_burrito()
+
+    # Get code
+    setup_code()
+
+    # Get NetCDF libraries for Debian
+    update_netcdf_libraries_debian()
+
+    # Process requirements.txt
+    install_requirements()
+
+    # Setup Nginx
+    execute(setup_nginx)
+
+    # Setup supervisord
+    update_supervisord()
+
+
 def setup_ld():
     admin()
     sudo("su -c \"echo '/usr/local/lib' > /etc/ld.so.conf.d/local.conf\"")
     sudo("ldconfig")
+
 
 def setup_gdal():
     admin()
@@ -186,67 +226,105 @@ def setup_gdal():
         run("./configure; make -j 4")
         sudo("make install")
 
+
+@roles('setup')
 def setup_nginx():
     admin()
     upload_template('deploy/nginx.conf', '/etc/nginx/nginx.conf', context=copy(env), use_sudo=True, backup=False, mirror_local_mode=True)
     upload_template('deploy/nginx_larva.conf', '/etc/nginx/conf.d/larva.conf', context=copy(env), use_sudo=True, backup=False, mirror_local_mode=True)
-    sudo("chkconfig nginx on")
+    sudo("insserv nginx")
     sudo("/etc/init.d/nginx restart")
 
+
+@roles('all')
 def update_supervisord():
     larva()
     run("pip install supervisor")
     upload_template('deploy/supervisord.conf', '/home/larva/supervisord.conf', context=copy(env), use_jinja=True, use_sudo=False, backup=False, mirror_local_mode=True, template_dir='.')
 
+
 def setup_code():
     larva()
     with cd("~"):
         run("rm -rf larva-service")
-        run("git clone https://github.com/asascience-open/larva-service.git")
+        run("git clone https://github.com/kwilcox/larva-service.git")
 
-    update_netcdf_libraries()
 
-@roles('runs','datasets','shorelines','web','all')
-def update_netcdf_libraries():
+def update_code():
+    larva()
+    with cd(code_dir):
+        run("git pull origin master")
+
+
+@roles('all')
+def install_requirements():
+    larva()
+    update_code()
+    with cd("~"):
+        # We do these seperately becasue they are Pytables requirements
+        run("pip install numpy==1.8.0")
+        run("pip install numexpr")
+        run("pip install cython")
+
+        # Pytables.  Ugh.  v.3.1.0
+        run("rm -rf PyTables")
+        run("git clone https://github.com/PyTables/PyTables.git")
+        with cd("PyTables"):
+            run("git checkout v.3.1.0")
+            run('HDF5_DIR=/opt/hdf5-1.8.12 python setup.py install --hdf5=/opt/hdf5-1.8.12 --lflags="-Xlinker -rpath -Xlinker /opt/hdf5-1.8.12/lib" --cflags="-w -O3 -msse2"')
+
+    with cd(code_dir):
+        run("HDF5_DIR=/opt/hdf5-1.8.12 NETCDF4_DIR=/opt/netcdf-4.3.1 pip install netCDF4")
+        run("pip install -e git+https://github.com/kwilcox/paegan.git@master#egg=paegan")
+        run("CPLUS_INCLUDE_PATH=/usr/include/gdal C_INCLUDE_PATH=/usr/include/gdal pip install -e git+https://github.com/kwilcox/paegan-transport.git@master#egg=paegan-transport")
+        run("pip install -e git+https://github.com/kwilcox/paegan-viz.git@master#egg=paegan-viz")
+        run("pip install -r requirements.txt")
+
+
+def update_netcdf_libraries_rh():
     admin()
     run("cd ~")
     run("wget https://asa-dev.s3.amazonaws.com/installNCO.txt")
     run("chmod 744 installNCO.txt")
     sudo("./installNCO.txt")
 
-    larva()
-    with cd(code_dir):
-        with settings(warn_only=True):
-            run("pip uninstall netCDF4 numpy")
 
-        run("pip install numpy==1.6.2")
-        run("HDF5_DIR=/usr/local/hdf5-1.8.10-patch1 NETCDF4_DIR=/usr/local/netcdf-4.2.1.1 PATH=$PATH:/usr/local/bin pip install -r requirements.txt")
+def update_netcdf_libraries_debian():
+    admin()
+    put(local_path='deploy/debian_netcdf.sh', remote_path='/root/debian_netcdf.sh', use_sudo=True, mirror_local_mode=True)
+    sudo("bash /root/debian_netcdf.sh")
+
 
 def setup_burrito():
     larva()
     run("curl -s https://raw.github.com/brainsik/virtualenv-burrito/master/virtualenv-burrito.sh | $SHELL")
-    run("mkvirtualenv -p /usr/bin/python27 larva")
+    run("mkvirtualenv -p /usr/bin/python2.7 larva")
     run("echo 'workon larva' >> ~/.bash_profile")
+
 
 def setup_larva_user():
     admin()
     # Setup larva user
-    sudo("useradd larva")
-    sudo("mkdir /home/larva/.ssh")
+    sudo("useradd -s /bin/bash -d /home/larva larva", warn_only=True)
+    sudo("mkdir -p /home/larva/.ssh", warn_only=True)
     upload_key_to_larva()
-    sudo("chown -R larva:larva /home/larva/.ssh")
+    sudo("chown -R larva:larva /home/larva/")
+
 
 def update_libs():
     larva()
     with cd(code_dir):
         with settings(warn_only=True):
-            run("pip uninstall -y paegan paegan-viz paegan-transport")
+            run("pip install -e git+https://github.com/kwilcox/paegan.git@master#egg=paegan")
+            run("CPLUS_INCLUDE_PATH=/usr/include/gdal C_INCLUDE_PATH=/usr/include/gdal pip install -e git+https://github.com/kwilcox/paegan-transport.git@master#egg=paegan-transport")
+            run("pip install -e git+https://github.com/kwilcox/paegan-viz.git@master#egg=paegan-viz")
             run("pip install -r requirements.txt")
 
 
 def supervisord_restart():
     stop_supervisord()
     start_supervisord()
+
 
 def stop_supervisord():
     larva()
@@ -257,10 +335,12 @@ def stop_supervisord():
 
     kill_pythons()
 
+
 def kill_pythons():
     admin()
     with settings(warn_only=True):
         sudo("kill -QUIT $(ps aux | grep python | grep -v supervisord | awk '{print $2}')")
+
 
 def start_supervisord():
     larva()
@@ -268,12 +348,14 @@ def start_supervisord():
         with settings(warn_only=True):
             run("supervisord -c ~/supervisord.conf")
 
+
 def upload_key_to_larva():
     admin()
     with settings(warn_only=True):
-        sudo("su -c \"echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCDBacNAOzKzPmFpJOClNrUwAsoh9YCzpKKqenbbbXQ/fqDVsOw/z522YDYuGoiZ6475YBET9L13ck4xh0XP5rykUvnAs0pvW7Vu1ttPxHx2wDmTfffRtN9Zbw4Y19c9vy9+NeIjrJxyLWwwnBrPHqf1R+O9HuvgmVSccevVnGpaaOJ9puaAFrmNO5cXxEI4WW+6+jsMBaVZqIaOl4U/eMcPTOsP8fn7+ME0YuIAIM2QDZMAUlWablhFYmkP8yfHIehc6IKgV0SupPOjH4vNTeJTMB0uPxhXDuwlJaW2zmxf+hbz7fR4X+WTgryBdUbksdCUuyTkDyERHUiwL8JbsQZ asa-particles-ec2' > /home/larva/.ssh/authorized_keys\"")
+        sudo("su -c \"echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDIG5QpeKt1uh0+yz17TIt3d1S9mV6ZnKXmK7DgtPofNoWg7z4Bi00BpDNLkjKGUMc/SZL9JUkscyb7yXoQXNip23Fdkxy4PPEHr3/6BdZ+7iwc2+5v+AfLsB7pbg/kdxfrGqhAZ9TFHKP8rjOUf8CR8fDUD1L5DNHK65yWF2iMt4fy+Awjibc2TMgphcy36ErSs83vETWrZXNzPhoAunRfD69ulluu6SWzfogypqaha7QRNnMWAOVzvTJYMAxVQ1h5GSZgCvaiqOkN5zUUVGEpKBfrZTsHsICyDpxphj9VA7hxH20wlIf4YlUvVRSngS97b10gTquTc4U84ZmVc1uT larva@axiompvd' > /home/larva/.ssh/authorized_keys\"")
         sudo("chmod 600 /home/larva/.ssh/authorized_keys")
         sudo("chmod 700 /home/larva/.ssh")
+
 
 @roles('setup')
 def setup_data():
@@ -307,6 +389,7 @@ def setup_data():
     if detach_vol_id.find("vol-") == 0:
         run("ec2-delete-volume %s --aws-access-key %s --aws-secret-key %s" % (detach_vol_id, env.aws_access, env.aws_secret))
 
+
 @roles('setup')
 def setup_scratch():
     admin()
@@ -338,7 +421,7 @@ def setup_scratch():
 
     # Delete the old volume
     if detach_vol_id.find("vol-") == 0:
-        run("ec2-delete-volume %s --aws-access-key %s --aws-secret-key %s" % (detach_vol_id, env.aws_access, env.aws_secret))    
+        run("ec2-delete-volume %s --aws-access-key %s --aws-secret-key %s" % (detach_vol_id, env.aws_access, env.aws_secret))
 
 
 @roles('setup')
@@ -359,12 +442,14 @@ def setup_filesystem():
         sudo("mkdir -p /scratch/cache")
         sudo("chown -R larva:larva /scratch")
 
+
 def setup_crontab():
     larva()
     src_file = "deploy/larva_crontab.txt"
     dst_file = "/home/larva/crontab.txt"
     upload_template(src_file, dst_file, context=copy(env), use_jinja=True, use_sudo=False, backup=False, mirror_local_mode=True)
     run("crontab %s" % dst_file)
+
 
 def setup_munin():
     admin()
