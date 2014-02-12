@@ -284,13 +284,18 @@ class ResultsPyTable(object):
         self._file  = open_file(output_file, mode="w", title="Model run output")
         self._root  = self._file.create_group("/", "trajectories", "Trajectory Data")
         self._table = self._file.create_table(self._root, "model_results", ModelResultsTable, "Model Results")
+        self._table.autoindex = False
+        self._table.cols.particle.create_index()
+        self._table.cols.time.create_index()
+        self._table.cols.latitude.create_index()
+        self._table.cols.longitude.create_index()
 
     def write(self, data):
         record = self._table.row
         for k, v in data.iteritems():
             try:
                 record[k] = v
-            except Exception, e:
+            except Exception:
                 # No column named "k", so don't add the data
                 pass
 
@@ -308,5 +313,5 @@ class ResultsPyTable(object):
 
     def close(self):
         self._table.flush()
+        self._table.reindex()
         self._file.close()
-
