@@ -190,13 +190,16 @@ class Run(Document):
         elif ext == ".json":
             file_type = "JSON"
         elif ext == ".geojson":
-            file_type = "Trackline (GeoJSON)"
+            if "particle_tracklines" in name:
+                file_type = "Particle Tracklines (GeoJSON)"
+            elif "center_trackline" in name:
+                file_type = "Center Trackline (GeoJSON)"
         elif ext == ".avi":
             file_type = "Animation"
         elif ext == ".log":
             file_type = "Logfile"
         elif ext == ".h5":
-            file_type = "HDF5"
+            file_type = "HDF5 Data File"
 
         return { file_type : file_link }
 

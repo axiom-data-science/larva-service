@@ -8,20 +8,17 @@ import math
 import sys
 import os
 import shutil
-import multiprocessing
 import logging
 from datetime import datetime
 from urlparse import urljoin, urlparse
 
 import threading
-import collections
 
 from paegan.transport.models.behavior import LarvaBehavior
 from paegan.transport.models.transport import Transport
 from paegan.transport.model_controller import BaseModelController, CachingModelController
 
 from logging import FileHandler
-from paegan.logger.progress_handler import ProgressHandler
 
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
@@ -35,6 +32,8 @@ import time
 import redis
 
 from larva_service.models.run import ResultsPyTable
+
+import paegan.transport.export as ex
 
 
 def run(run_id):
@@ -91,9 +90,9 @@ def run(run_id):
             pubsub.close()
             sys.exit()
 
-        def listen_for_results():
+        def listen_for_results(output_h5_file):
             # Create output file (hdf5)
-            results = ResultsPyTable(os.path.join(output_path, "results.h5"))
+            results = ResultsPyTable(output_h5_file)
             pubsub = r.pubsub()
             pubsub.subscribe("%s:results" % run_id)
             for msg in pubsub.listen():
@@ -115,7 +114,8 @@ def run(run_id):
         pl.daemon = True
         pl.start()
 
-        rl = threading.Thread(name="ResultListener", target=listen_for_results)
+        output_h5_file = os.path.join(output_path, "results.h5")
+        rl = threading.Thread(name="ResultListener", target=listen_for_results, args=(output_h5_file,))
         rl.daemon = True
         rl.start()
 
@@ -209,7 +209,7 @@ def run(run_id):
 
         finally:
 
-            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 99, "message" : "Processing output files and cleaning up"}))
+            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 98, "message" : "Processing output files and cleaning up"}))
 
             # Add a finished to the end.
             r.publish("%s:log" % run_id, "FINISHED")
@@ -239,6 +239,11 @@ def run(run_id):
             # Move cachefile to output directory if we made one
             if run['caching']:
                 shutil.move(cache_file, output_path)
+
+            # Compute common output from HDF5 file and put in output_path
+            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 99, "message" : "Exporting Results"}))
+            ex.H5Trackline.export(folder=output_path, h5_file=output_h5_file)
+            ex.H5ParticleTracklines.export(folder=output_path, h5_file=output_h5_file)
 
             output_files = []
             for filename in os.listdir(output_path):
