@@ -194,6 +194,8 @@ class Run(Document):
                 file_type = "Particle Tracklines (GeoJSON)"
             elif "center_trackline" in name:
                 file_type = "Center Trackline (GeoJSON)"
+            elif "particle_multipoint" in name:
+                file_type = "Particle MultiPoint (GeoJSON)"
         elif ext == ".avi":
             file_type = "Animation"
         elif ext == ".log":

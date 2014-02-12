@@ -244,6 +244,7 @@ def run(run_id):
             r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 99, "message" : "Exporting Results"}))
             ex.H5Trackline.export(folder=output_path, h5_file=output_h5_file)
             ex.H5ParticleTracklines.export(folder=output_path, h5_file=output_h5_file)
+            ex.H5ParticleMultiPoint.export(folder=output_path, h5_file=output_h5_file)
 
             output_files = []
             for filename in os.listdir(output_path):
