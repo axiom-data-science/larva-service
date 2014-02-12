@@ -18,7 +18,7 @@ import collections
 
 from paegan.transport.models.behavior import LarvaBehavior
 from paegan.transport.models.transport import Transport
-from paegan.transport.model_controller import ModelController
+from paegan.transport.model_controller import BaseModelController, CachingModelController
 
 from logging import FileHandler
 from paegan.logger.progress_handler import ProgressHandler
@@ -149,15 +149,52 @@ def run(run_id):
                 models.append(l)
             models.append(Transport(horizDisp=run['horiz_dispersion'], vertDisp=run['vert_dispersion']))
 
-            # Setup ModelController
-            model = ModelController(geometry=geometry, depth=start_depth, start=start_time, step=time_step, nstep=num_steps, npart=num_particles, models=models, use_bathymetry=True, use_shoreline=True,
-                                    time_chunk=run['time_chunk'], horiz_chunk=run['horiz_chunk'], time_method=run['time_method'], shoreline_path=shoreline_path, shoreline_feature=shoreline_feat, reverse_distance=1500, shoreline_index_buffer=0.1)
+            hydropath = run['hydro_path']
 
-            # Run the model
-            cache_file = os.path.join(cache_path, run_id + ".nc.cache")
-            bathy_file = current_app.config['BATHY_PATH']
+            url = urlparse(hydropath)
+            if url.scheme == '':
+                # Local dataset
+                model = BaseModelController(geometry=geometry,
+                                            depth=start_depth,
+                                            start=start_time,
+                                            step=time_step,
+                                            nstep=num_steps,
+                                            npart=num_particles,
+                                            models=models,
+                                            use_bathymetry=True,
+                                            bathy_path=current_app.config['BATHY_PATH'],
+                                            use_shoreline=True,
+                                            time_method=run['time_method'],
+                                            shoreline_path=shoreline_path,
+                                            shoreline_feature=shoreline_feat,
+                                            reverse_distance=1500,
+                                            shoreline_index_buffer=0.1)
 
-            model.run(run['hydro_path'], output_formats=["redis", "trackline"], output_path=output_path, redis_url=current_app.config.get("RESULTS_REDIS_URI"), redis_results_channel="%s:results" % run_id, redis_log_channel="%s:log" % run_id, bathy=bathy_file, cache=cache_file, remove_cache=False, caching=run['caching'])
+                # Run the model
+                model.run(hydropath, output_formats=["redis"], redis_url=current_app.config.get("RESULTS_REDIS_URI"), redis_results_channel="%s:results" % run_id, redis_log_channel="%s:log" % run_id)
+            else:
+                # Remote dataset
+                model = CachingModelController(geometry=geometry,
+                                               depth=start_depth,
+                                               start=start_time,
+                                               step=time_step,
+                                               nstep=num_steps,
+                                               npart=num_particles,
+                                               models=models,
+                                               use_bathymetry=True,
+                                               bathy_path=current_app.config['BATHY_PATH'],
+                                               use_shoreline=True,
+                                               time_chunk=run['time_chunk'],
+                                               horiz_chunk=run['horiz_chunk'],
+                                               time_method=run['time_method'],
+                                               shoreline_path=shoreline_path,
+                                               shoreline_feature=shoreline_feat,
+                                               reverse_distance=1500,
+                                               shoreline_index_buffer=0.1)
+
+                # Run the model
+                cache_file = os.path.join(cache_path, run_id + ".nc.cache")
+                model.run(hydropath, output_formats=["redis"], redis_url=current_app.config.get("RESULTS_REDIS_URI"), redis_results_channel="%s:results" % run_id, redis_log_channel="%s:log" % run_id, cache_path=cache_file, remove_cache=False)
 
             job.meta["outcome"] = "success"
             job.save()
