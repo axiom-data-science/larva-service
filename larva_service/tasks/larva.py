@@ -245,6 +245,7 @@ def run(run_id):
             ex.H5Trackline.export(folder=output_path, h5_file=output_h5_file)
             ex.H5ParticleTracklines.export(folder=output_path, h5_file=output_h5_file)
             ex.H5ParticleMultiPoint.export(folder=output_path, h5_file=output_h5_file)
+            ex.H5GDALShapefile.export(folder=output_path, h5_file=output_h5_file)
 
             output_files = []
             for filename in os.listdir(output_path):
