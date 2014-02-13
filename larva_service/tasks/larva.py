@@ -168,7 +168,7 @@ def run(run_id):
                                             shoreline_path=shoreline_path,
                                             shoreline_feature=shoreline_feat,
                                             reverse_distance=1500,
-                                            shoreline_index_buffer=0.1)
+                                            shoreline_index_buffer=0.05)
 
                 # Run the model
                 model.run(hydropath, output_formats=["redis"], redis_url=current_app.config.get("RESULTS_REDIS_URI"), redis_results_channel="%s:results" % run_id, redis_log_channel="%s:log" % run_id)
@@ -190,7 +190,7 @@ def run(run_id):
                                                shoreline_path=shoreline_path,
                                                shoreline_feature=shoreline_feat,
                                                reverse_distance=1500,
-                                               shoreline_index_buffer=0.1)
+                                               shoreline_index_buffer=0.05)
 
                 # Run the model
                 cache_file = os.path.join(cache_path, run_id + ".nc.cache")
