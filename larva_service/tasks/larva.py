@@ -140,6 +140,7 @@ def run(run_id):
             start_time     = run['start'].replace(tzinfo = pytz.utc)
             shoreline_path = run['shoreline_path'] or app.config.get("SHORE_PATH")
             shoreline_feat = run['shoreline_feature']
+            caching        = None  # Used later to move cache file if we created one
 
             # Setup Models
             models = []
@@ -195,6 +196,7 @@ def run(run_id):
                 # Run the model
                 cache_file = os.path.join(cache_path, run_id + ".nc.cache")
                 model.run(hydropath, output_formats=["redis"], redis_url=current_app.config.get("RESULTS_REDIS_URI"), redis_results_channel="%s:results" % run_id, redis_log_channel="%s:log" % run_id, cache_path=cache_file, remove_cache=False)
+                caching = True
 
             job.meta["outcome"] = "success"
             job.save()
@@ -237,7 +239,7 @@ def run(run_id):
             shutil.move(log_file, os.path.join(output_path, 'model.log'))
 
             # Move cachefile to output directory if we made one
-            if run['caching']:
+            if caching:
                 shutil.move(cache_file, output_path)
 
             # Compute common output from HDF5 file and put in output_path

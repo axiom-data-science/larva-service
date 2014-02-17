@@ -7,13 +7,12 @@ import json
 import urllib2
 import pytz
 import os
-import calendar
 from urlparse import urlparse
-import mimetypes
-from shapely.geometry import Point, Polygon, asShape
+from shapely.geometry import Point, asShape
 import geojson
 from shapely.wkt import loads
 from rq.job import Job
+
 
 class RunMigration(DocumentMigration):
     def allmigration01__add_results_field(self):
@@ -32,50 +31,43 @@ class RunMigration(DocumentMigration):
         self.target = {'shoreline_path':{'$exists':False}, 'shoreline_feature':{'$exists':False}}
         self.update = {'$set':{'shoreline_path':u'', 'shoreline_feature':u''}}
 
-    def allmigration05__add_caching_field(self):
-        self.target = {'caching' : {'$exists' : False }}
-        self.update = {'$set' : {'caching' : True }}
 
 class Run(Document):
     __collection__ = 'runs'
     use_dot_notation = True
     structure = {
-       'name'               : unicode,
-       'behavior'           : unicode,  # URL to Behavior JSON
-       'cached_behavior'    : dict,     # Save the contents of behavior URL
-       'particles'          : int,      # Number of particles to force
-       'hydro_path'         : unicode,  # OPeNDAP or Local file path
-       'geometry'           : unicode,  # WKT
-       'release_depth'      : float,    # Release depth
-       'start'              : datetime, # Release in time
-       'duration'           : int,      # Days
-       'timestep'           : int,      # In seconds, the timestep between calculations
-       'horiz_dispersion'   : float,    # Horizontal dispersion, in m/s
-       'vert_dispersion'    : float,    # Horizontal dispersion, in m/s
-       'time_chunk'         : int,
-       'horiz_chunk'        : int,
-       'time_method'        : unicode,  # Time method, 'nearest' or 'interp'
-       'created'            : datetime,
-       'task_id'            : unicode,
-       'email'              : unicode,   # Email of the person who ran the model
-       'output'             : list,
-       'task_result'        : unicode,
-       'trackline'          : unicode,
-       'ended'              : datetime,
-       'shoreline_path'     : unicode,
-       'shoreline_feature'  : unicode,
-       'caching'            : bool
+        'name'               : unicode,
+        'behavior'           : unicode,   # URL to Behavior JSON
+        'cached_behavior'    : dict,      # Save the contents of behavior URL
+        'particles'          : int,       # Number of particles to force
+        'hydro_path'         : unicode,   # OPeNDAP or Local file path
+        'geometry'           : unicode,   # WKT
+        'release_depth'      : float,     # Release depth
+        'start'              : datetime,  # Release in time
+        'duration'           : int,       # Days
+        'timestep'           : int,       # In seconds, the timestep between calculations
+        'horiz_dispersion'   : float,     # Horizontal dispersion, in m/s
+        'vert_dispersion'    : float,     # Horizontal dispersion, in m/s
+        'time_chunk'         : int,
+        'horiz_chunk'        : int,
+        'time_method'        : unicode,   # Time method, 'nearest' or 'interp'
+        'created'            : datetime,
+        'task_id'            : unicode,
+        'email'              : unicode,   # Email of the person who ran the model
+        'output'             : list,
+        'task_result'        : unicode,
+        'trackline'          : unicode,
+        'ended'              : datetime,
+        'shoreline_path'     : unicode,
+        'shoreline_feature'  : unicode
     }
-    default_values = {
-                      'created': datetime.utcnow,
-                      'time_chunk'  : 10,
-                      'horiz_chunk' : 5,
-                      'time_method' : u'interp',
-                      'caching'     : True
-                      }
+    default_values = {  'created': datetime.utcnow,
+                        'time_chunk'  : 10,
+                        'horiz_chunk' : 5,
+                        'time_method' : u'interp' }
     migration_handler = RunMigration
 
-    restrict_loading = ["output", "task_result", "trackline", "task_id", "created", "cached_behavior","output", "ended"]
+    restrict_loading = ["output", "task_result", "trackline", "task_id", "created", "cached_behavior", "output", "ended"]
 
     def compute(self):
         """
