@@ -240,7 +240,10 @@ class Run(Document):
                 self[key] = float(value)
 
             else:
-                self[key] = value
+                try:
+                    setattr(self, key, value)
+                except Exception:
+                    app.logger.exception("Unknown run config key: %s.  Ignoring." % key)
 
         if self.behavior:
             try:
