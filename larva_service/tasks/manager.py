@@ -1,4 +1,4 @@
-from larva_service import app, db, slugify
+from larva_service import app, db, slugify, particle_queue
 from flask import current_app
 from shapely.wkt import loads
 import json
@@ -16,7 +16,8 @@ import threading
 
 from paegan.transport.models.behavior import LarvaBehavior
 from paegan.transport.models.transport import Transport
-from paegan.transport.model_controller import BaseModelController, CachingModelController
+from paegan.transport.forcers import BaseForcer
+from paegan.transport.model_controller import DistributedModelController
 
 from logging import FileHandler
 
@@ -36,7 +37,43 @@ from larva_service.models.run import ResultsPyTable
 import paegan.transport.export as ex
 
 
-def run(run_id):
+def particle(hydrodataset, part, model):
+
+    from paegan.logger import logger
+    from paegan.logger.redis_handler import RedisHandler
+    rhandler = RedisHandler(model.redis_log_channel, model.redis_url)
+    rhandler.setLevel(logging.PROGRESS)
+    logger.addHandler(rhandler)
+
+    try:
+        redis_connection = redis.from_url(model.redis_url)
+        forcer = BaseForcer(hydrodataset,
+                            particle=part,
+                            common_variables=model.common_variables,
+                            times=model.times,
+                            start_time=model.start,
+                            models=model._models,
+                            release_location_centroid=model.reference_location.point,
+                            usebathy=model._use_bathymetry,
+                            useshore=model._use_shoreline,
+                            usesurface=model._use_seasurface,
+                            reverse_distance=model.reverse_distance,
+                            bathy_path=model.bathy_path,
+                            shoreline_path=model.shoreline_path,
+                            shoreline_feature=model.shoreline_feature,
+                            time_method=model.time_method,
+                            redis_url=model.redis_url,
+                            redis_results_channel=model.redis_results_channel,
+                            shoreline_index_buffer=model.shoreline_index_buffer
+                           )
+        forcer.run()
+    except Exception:
+        redis_connection.publish(model.redis_results_channel, json.dumps({"status" : "FAILED", "uid" : part.uid }))
+    else:
+        redis_connection.publish(model.redis_results_channel, json.dumps({"status" : "COMPLETED", "uid" : part.uid }))
+
+
+def manager(run_id):
 
     with app.app_context():
 
@@ -66,44 +103,68 @@ def run(run_id):
         redis_pool = redis.ConnectionPool(host=res.hostname, port=res.port, db=res.path[1:])
         r = redis.Redis(connection_pool=redis_pool)
 
+        run = db.Run.find_one( { '_id' : ObjectId(run_id) } )
+        if run is None:
+            return "Failed to locate run %s. May have been deleted while task was in the queue?" % run_id
+
         def listen_for_logs():
             pubsub = r.pubsub()
             pubsub.subscribe("%s:log" % run_id)
             for msg in pubsub.listen():
+
                 if msg['type'] != "message":
                     continue
 
                 if msg["data"] == "FINISHED":
                     break
 
-                prog = json.loads(msg["data"])
-                if prog is not None:
-                    if prog.get("level", "").lower() == "progress":
-                        job.meta["progress"] = prog.get("value", job.meta.get("progress", None))
-                        job.meta["message"]  = prog.get("message", job.meta.get("message", ""))
-                        job.meta["updated"]  = prog.get("time", datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.utc))
-                        job.save()
-                        logger.info("PROGRESS: %(value)d - %(message)s" % prog)
-                    else:
-                        getattr(logger, prog["level"].lower())(prog.get("message"))
+                try:
+                    prog = json.loads(msg["data"])
+                    if prog is not None:
+                        if prog.get("level", "").lower() == "progress":
+                            job.meta["progress"] = float(prog.get("value", job.meta.get("progress", None)))
+                            job.meta["message"]  = prog.get("message", job.meta.get("message", ""))
+                            job.meta["updated"]  = prog.get("time", datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.utc))
+                            job.save()
+                            logger.info("PROGRESS: %(value).2f - %(message)s" % prog)
+                        else:
+                            getattr(logger, prog["level"].lower())(prog.get("message"))
+                except Exception:
+                    logger.info("Got strange result: %s" % msg["data"])
+                    pass
 
             pubsub.close()
             sys.exit()
 
-        def listen_for_results(output_h5_file):
+        def listen_for_results(output_h5_file, total_particles):
             # Create output file (hdf5)
+            particles_finished = 0
             results = ResultsPyTable(output_h5_file)
             pubsub = r.pubsub()
             pubsub.subscribe("%s:results" % run_id)
             for msg in pubsub.listen():
+
                 if msg['type'] != "message":
                     continue
 
                 if msg["data"] == "FINISHED":
                     break
 
-                # Write to HDF file
-                results.write(json.loads(msg["data"]))
+                try:
+                    json_msg = json.loads(msg["data"])
+                    if json_msg.get("status", None):
+                        #  "COMPLETED" or "FAILED" when a particle finishes
+                        particles_finished += 1
+                        percent_complete = 90. * (float(particles_finished) / float(total_particles)) + 5  # Add the 5 progress that was used prior to the particles starting (controller)
+                        r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : percent_complete, "message" : "Particle #%s %s!" % (particles_finished, json_msg.get("status"))}))
+                        if particles_finished == total_particles:
+                            break
+                    else:
+                        # Write to HDF file
+                        results.write(json_msg)
+                except Exception:
+                    logger.info("Got strange result: %s" % msg["data"])
+                    pass
 
             pubsub.close()
             results.compute()
@@ -115,7 +176,7 @@ def run(run_id):
         pl.start()
 
         output_h5_file = os.path.join(output_path, "results.h5")
-        rl = threading.Thread(name="ResultListener", target=listen_for_results, args=(output_h5_file,))
+        rl = threading.Thread(name="ResultListener", target=listen_for_results, args=(output_h5_file, run['particles']))
         rl.daemon = True
         rl.start()
 
@@ -125,13 +186,9 @@ def run(run_id):
         model = None
         try:
 
-            #logger.progress((0, "Configuring model"))
-            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 0, "message" : "Configuring model"}))
+            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 0, "message" : "Setting up model"}))
 
-            run = db.Run.find_one( { '_id' : ObjectId(run_id) } )
-            if run is None:
-                return "Failed to locate run %s. May have been deleted while task was in the queue?" % run_id
-
+            hydropath      = run['hydro_path']
             geometry       = loads(run['geometry'])
             start_depth    = run['release_depth']
             num_particles  = run['particles']
@@ -140,7 +197,6 @@ def run(run_id):
             start_time     = run['start'].replace(tzinfo = pytz.utc)
             shoreline_path = run['shoreline_path'] or app.config.get("SHORE_PATH")
             shoreline_feat = run['shoreline_feature']
-            caching        = None  # Used later to move cache file if we created one
 
             # Setup Models
             models = []
@@ -150,31 +206,7 @@ def run(run_id):
                 models.append(l)
             models.append(Transport(horizDisp=run['horiz_dispersion'], vertDisp=run['vert_dispersion']))
 
-            hydropath = run['hydro_path']
-
-            url = urlparse(hydropath)
-            if url.scheme == '':
-                # Local dataset
-                model = BaseModelController(geometry=geometry,
-                                            depth=start_depth,
-                                            start=start_time,
-                                            step=time_step,
-                                            nstep=num_steps,
-                                            npart=num_particles,
-                                            models=models,
-                                            use_bathymetry=True,
-                                            bathy_path=current_app.config['BATHY_PATH'],
-                                            use_shoreline=True,
-                                            time_method=run['time_method'],
-                                            shoreline_path=shoreline_path,
-                                            shoreline_feature=shoreline_feat,
-                                            shoreline_index_buffer=0.05)
-
-                # Run the model
-                model.run(hydropath, output_formats=["redis"], redis_url=current_app.config.get("RESULTS_REDIS_URI"), redis_results_channel="%s:results" % run_id, redis_log_channel="%s:log" % run_id)
-            else:
-                # Remote dataset
-                model = CachingModelController(geometry=geometry,
+            model = DistributedModelController(geometry=geometry,
                                                depth=start_depth,
                                                start=start_time,
                                                step=time_step,
@@ -184,39 +216,45 @@ def run(run_id):
                                                use_bathymetry=True,
                                                bathy_path=current_app.config['BATHY_PATH'],
                                                use_shoreline=True,
-                                               time_chunk=run['time_chunk'],
-                                               horiz_chunk=run['horiz_chunk'],
                                                time_method=run['time_method'],
                                                shoreline_path=shoreline_path,
                                                shoreline_feature=shoreline_feat,
                                                shoreline_index_buffer=0.05)
 
-                # Run the model
-                cache_file = os.path.join(cache_path, run_id + ".nc.cache")
-                model.run(hydropath, output_formats=["redis"], redis_url=current_app.config.get("RESULTS_REDIS_URI"), redis_results_channel="%s:results" % run_id, redis_log_channel="%s:log" % run_id, cache_path=cache_file, remove_cache=False)
-                caching = True
-
-            job.meta["outcome"] = "success"
-            job.save()
-            return "Successfully ran %s" % run_id
+            model.setup_run(hydropath, output_formats=["redis"], redis_url=current_app.config.get("RESULTS_REDIS_URI"), redis_results_channel="%s:results" % run_id, redis_log_channel="%s:log" % run_id)
 
         except Exception as exception:
-            logger.warn("Run FAILED, cleaning up and uploading log.")
+            logger.warn("Run failed to initialize, cleaning up.")
             logger.warn(exception.message)
+            job.meta["outcome"] = "failed"
+            job.save()
+            raise
+
+        try:
+            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 4, "message" : "Adding particles to queue"}))
+            for part in model.particles:
+                particle_queue.enqueue_call(func=particle, args=(hydropath, part, model,))
+
+        except Exception, exception:
+            logger.warn("Failed to start particles, cleaning up.")
+            logger.warn(exception.message)
+            r.publish("%s:results" % run_id, "FINISHED")
             job.meta["outcome"] = "failed"
             job.save()
             raise
 
         finally:
 
-            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 98, "message" : "Processing output files and cleaning up"}))
-
-            # Add a finished to the end.
-            r.publish("%s:log" % run_id, "FINISHED")
-            r.publish("%s:results" % run_id, "FINISHED")
-            # Wait for results to be written
-            pl.join()
+            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 5, "message" : "Waiting for particles to finish..."}))
+            # Wait for results to be written.  This thread exits when it has recieved a message from all particle runners
             rl.join()
+
+            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 96, "message" : "Processing output files and cleaning up"}))
+            # Send message to the log listener to finish
+            r.publish("%s:log" % run_id, "FINISHED")
+            # Wait for log listener to exit
+            pl.join()
+
             # Remove all connections
             redis_pool.disconnect()
 
@@ -236,12 +274,7 @@ def run(run_id):
             # Move logfile to output directory
             shutil.move(log_file, os.path.join(output_path, 'model.log'))
 
-            # Move cachefile to output directory if we made one
-            if caching:
-                shutil.move(cache_file, output_path)
-
             # Compute common output from HDF5 file and put in output_path
-            r.publish("%s:log" % run_id, json.dumps({"time" : datetime.utcnow().isoformat(), "level" : "progress", "value" : 99, "message" : "Exporting Results"}))
             ex.H5Trackline.export(folder=output_path, h5_file=output_h5_file)
             ex.H5ParticleTracklines.export(folder=output_path, h5_file=output_h5_file)
             ex.H5ParticleMultiPoint.export(folder=output_path, h5_file=output_h5_file)
@@ -261,10 +294,6 @@ def run(run_id):
                 bucket = conn.get_bucket(current_app.config['S3_BUCKET'])
 
                 for outfile in output_files:
-                    # Don't upload the cache file
-                    if os.path.basename(outfile) == os.path.basename(cache_file):
-                        continue
-
                     # Upload the outfile with the same as the run name
                     _, ext = os.path.splitext(outfile)
                     new_filename = slugify(unicode(run['name'])) + ext
@@ -281,6 +310,12 @@ def run(run_id):
             else:
                 result_files = output_files
 
+            job.meta["outcome"] = "success"
+            job.meta["progress"] = 100
+            job.meta["updated"]  = datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.utc)
+            job.meta["message"]  = "Complete"
+            job.save()
+
             # Set output fields
             run.output = result_files
             run.ended = datetime.utcnow()
@@ -288,6 +323,3 @@ def run(run_id):
             run.save()
 
             del model
-
-            job.meta["message"] = "Complete"
-            job.save()

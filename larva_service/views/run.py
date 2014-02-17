@@ -1,16 +1,16 @@
 import os
-import io
-
-from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, abort
-from larva_service import app, db, run_queue
-from larva_service.models.run import Run
-from larva_service.tasks.larva import run as larva_run
-from larva_service.views.helpers import requires_auth
 import json
-import pytz
-from larva_service.models import remove_mongo_keys
-from pymongo import DESCENDING
+
 from rq import cancel_job
+from pymongo import DESCENDING
+from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, abort
+
+from larva_service import app, db, run_queue
+from larva_service.models import remove_mongo_keys
+from larva_service.views.helpers import requires_auth
+from larva_service.tasks.larva import run as larva_run
+from larva_service.tasks.manager import manager as manager_run
+
 
 @app.route('/run', methods=['GET', 'POST'])
 @app.route('/run.<string:format>', methods=['GET', 'POST'])
@@ -41,7 +41,11 @@ def run_larva_model(format=None):
     run.save()
 
     # Enqueue
-    job = run_queue.enqueue_call(func=larva_run, args=(unicode(run['_id']),))
+    if app.config.get("DISTRIBUTE", None):
+        job = run_queue.enqueue_call(func=larva_run, args=(unicode(run['_id']),))
+    else:
+        job = run_queue.enqueue_call(func=manager_run, args=(unicode(run['_id']),))
+
     run.task_id = unicode(job.id)
     run.save()
 
@@ -52,8 +56,9 @@ def run_larva_model(format=None):
     elif format == 'json':
         return jsonify( { 'results' : unicode(run['_id']) } )
 
-@app.route('/runs/<ObjectId:run_id>/delete', methods=['GET','DELETE'])
-@app.route('/runs/<ObjectId:run_id>/delete.<string:format>', methods=['GET','DELETE'])
+
+@app.route('/runs/<ObjectId:run_id>/delete', methods=['GET', 'DELETE'])
+@app.route('/runs/<ObjectId:run_id>/delete.<string:format>', methods=['GET', 'DELETE'])
 @requires_auth
 def delete_run(run_id, format=None):
     if format is None:
@@ -69,11 +74,13 @@ def delete_run(run_id, format=None):
         flash("Run deleted")
         return redirect(url_for('runs'))
 
+
 @app.route('/runs/clear', methods=['GET'])
 @requires_auth
 def clear_runs():
     db.drop_collection("runs")
     return redirect(url_for('runs'))
+
 
 @app.route('/runs', methods=['GET'])
 @app.route('/runs.<string:format>', methods=['GET'])
@@ -99,6 +106,7 @@ def runs(format=None):
         flash("Reponse format '%s' not supported" % format)
         return redirect(url_for('runs'))
 
+
 @app.route('/runs/<ObjectId:run_id>', methods=['GET'])
 @app.route('/runs/<ObjectId:run_id>.<string:format>', methods=['GET'])
 def show_run(run_id, format=None):
@@ -112,11 +120,10 @@ def show_run(run_id, format=None):
         linestring = run.google_maps_trackline()
         run_config = json.dumps(run.run_config(), sort_keys=True, indent=4)
         cached_behavior = json.dumps(run.cached_behavior, sort_keys=True, indent=4)
-        output_files = run.output_files()
         return render_template('show_run.html', run=run, run_config=run_config, cached_behavior=cached_behavior, line=linestring, markers=markers)
     elif format == 'json':
         jsond = json.loads(run.to_json())
-        remove_mongo_keys(jsond, extra=['output','task_result','task_id'])
+        remove_mongo_keys(jsond, extra=['output', 'task_result', 'task_id'])
         jsond['_id'] = unicode(run._id)
         jsond['status'] = unicode(run.status())
         jsond['output'] = list(run.output_files())
@@ -124,6 +131,7 @@ def show_run(run_id, format=None):
     else:
         flash("Reponse format '%s' not supported" % format)
         return redirect(url_for('runs'))
+
 
 @app.route('/runs/<ObjectId:run_id>/status', methods=['GET'])
 @app.route('/runs/<ObjectId:run_id>/status.<string:format>', methods=['GET'])
@@ -139,6 +147,7 @@ def status_run(run_id, format=None):
     else:
         flash("Reponse format '%s' not supported" % format)
         return redirect(url_for('runs'))
+
 
 @app.route('/runs/<ObjectId:run_id>/run_config', methods=['GET'])
 def run_config(run_id):
