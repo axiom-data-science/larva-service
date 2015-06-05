@@ -188,9 +188,10 @@ class Run(Document):
         if ext == ".zip":
             file_type = "Shapefile"
         elif ext == ".nc":
-            file_type = "NetCDF"
-        elif ext == ".cache":
-            file_type = "Forcing Data"
+            if 'cache' in name:
+                file_type = "Forcing Data"
+            else:
+                file_type = "NetCDF"
         elif ext == ".json":
             file_type = "JSON"
         elif ext == ".geojson":
@@ -268,64 +269,3 @@ class Run(Document):
 
 
 db.register([Run])
-
-
-from tables import *
-
-
-# Pytables representation of a model run
-class ModelResultsTable(IsDescription):
-    particle    = UInt8Col()
-    time        = Time32Col()
-    latitude    = Float32Col()
-    longitude   = Float32Col()
-    depth       = Float32Col()
-    u_vector    = Float32Col()
-    v_vector    = Float32Col()
-    w_vector    = Float32Col()
-    temperature = Float32Col()
-    salinity    = Float32Col()
-    age         = Float32Col()
-    lifestage   = UInt8Col()
-    progress    = Float32Col()
-    settled     = BoolCol()
-    halted      = BoolCol()
-    dead        = BoolCol()
-
-
-class ResultsPyTable(object):
-    def __init__(self, output_file):
-        self._file  = open_file(output_file, mode="w", title="Model run output")
-        self._root  = self._file.create_group("/", "trajectories", "Trajectory Data")
-        self._table = self._file.create_table(self._root, "model_results", ModelResultsTable, "Model Results")
-        self._table.autoindex = False
-        self._table.cols.particle.create_index()
-        self._table.cols.time.create_index()
-        self._table.cols.latitude.create_index()
-        self._table.cols.longitude.create_index()
-
-    def write(self, data):
-        record = self._table.row
-        for k, v in data.iteritems():
-            try:
-                record[k] = v
-            except Exception:
-                # No column named "k", so don't add the data
-                pass
-
-        record.append()
-
-    def trackline(self):
-        pass
-
-    def metadata(self):
-        pass
-
-    def compute(self):
-        self.trackline()
-        self.metadata()
-
-    def close(self):
-        self._table.flush()
-        self._table.reindex()
-        self._file.close()
