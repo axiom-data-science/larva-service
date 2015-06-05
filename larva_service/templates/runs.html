@@ -28,7 +28,8 @@
                 <th>created (utc)</th>
                 <th>progress</th>
                 <th>message</th>
-                <th>duration of run</th>
+                <th>run</th>
+                <th>waiting</th>
                 <th>actions</th>
             </tr>
         </thead>
@@ -40,7 +41,8 @@
                 <td>{{ run.created | datetimeformat }}</td>
                 <td>{{ run.progress() }}%</td>
                 <td>{{ run.message() }}</td>
-                <td>{{ run.created | timedeltaformat(run.ended) }}</td>
+                <td>{{ run.started | timedeltaformat(run.ended) }}</td>
+                <td>{{ run.created | timedeltaformat(run.started) }}</td>
                 <td>
                     <a href="{{ url_for('show_run', run_id=run._id) }}">View</a>
                     <a href="{{ url_for('delete_run', run_id=run._id) }}">Delete</a>

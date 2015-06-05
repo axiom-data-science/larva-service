@@ -16,20 +16,24 @@ from rq.job import Job
 
 class RunMigration(DocumentMigration):
     def allmigration01__add_results_field(self):
-        self.target = {'task_result':{'$exists': False}}
-        self.update = {'$set':{'task_result':""}}
+        self.target = {'task_result': {'$exists': False}}
+        self.update = {'$set': {'task_result': ""}}
 
     def allmigration02__add_name_field(self):
-        self.target = {'name':{'$exists': False}}
-        self.update = {'$set':{'name':""}}
+        self.target = {'name': {'$exists': False}}
+        self.update = {'$set': {'name': ""}}
 
     def allmigration03__add_duration_field(self):
-        self.target = {'ended':{'$exists': False}}
-        self.update = {'$set':{'ended':""}}
+        self.target = {'ended': {'$exists': False}}
+        self.update = {'$set': {'ended': ""}}
 
     def allmigration04__add_shoreline_fields(self):
-        self.target = {'shoreline_path':{'$exists':False}, 'shoreline_feature':{'$exists':False}}
-        self.update = {'$set':{'shoreline_path':u'', 'shoreline_feature':u''}}
+        self.target = {'shoreline_path': {'$exists': False}, 'shoreline_feature': {'$exists': False}}
+        self.update = {'$set': {'shoreline_path': u'', 'shoreline_feature': u''}}
+
+    def allmigration05__add_started_fields(self):
+        self.target = {'started': {'$exists': False}}
+        self.update = {'$set': {'started': ''}}
 
 
 class Run(Document):
@@ -57,6 +61,7 @@ class Run(Document):
         'output'             : list,
         'task_result'        : unicode,
         'trackline'          : unicode,   # GeoJSON
+        'started'            : datetime,
         'ended'              : datetime,
         'shoreline_path'     : unicode,
         'shoreline_feature'  : unicode

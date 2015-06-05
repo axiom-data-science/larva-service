@@ -1,5 +1,6 @@
 import os
 import json
+from urlparse import urlparse
 
 from rq import cancel_job
 from pymongo import DESCENDING
@@ -8,8 +9,8 @@ from flask import render_template, redirect, url_for, request, flash, jsonify, s
 from larva_service import app, db, run_queue, redis_connection
 from larva_service.models import remove_mongo_keys
 from larva_service.views.helpers import requires_auth
-from larva_service.tasks.larva import run as larva_run
-from larva_service.tasks.manager import manager as manager_run
+from larva_service.tasks.local import run as local_run
+from larva_service.tasks.distributed import run as distributed_run
 
 
 @app.route('/run', methods=['GET', 'POST'])
@@ -41,10 +42,13 @@ def run_larva_model(format=None):
     run.save()
 
     # Enqueue
-    if app.config.get("DISTRIBUTE", None):
-        job = run_queue.enqueue_call(func=larva_run, args=(unicode(run['_id']),))
+
+    if urlparse(run.hydro_path).scheme != '':
+        # DAP, use the CachingModelController
+        job = run_queue.enqueue_call(func=local_run, args=(unicode(run['_id']),))
     else:
-        job = run_queue.enqueue_call(func=manager_run, args=(unicode(run['_id']),))
+        # Local file path, use the DistributedModelController
+        job = run_queue.enqueue_call(func=distributed_run, args=(unicode(run['_id']),))
 
     run.task_id = unicode(job.id)
     run.save()

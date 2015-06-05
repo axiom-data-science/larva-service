@@ -3,13 +3,14 @@ from datetime import datetime
 import time
 from larva_service import app, db, dataset_queue
 
+
 def calc(dataset_id):
 
     with app.app_context():
 
         # Save results back to Run
         dataset = db.Dataset.find_one( { '_id' : ObjectId(dataset_id) } )
-        
+
         if dataset is None:
             return "No Dataset exists to update, aborting update process for ID %s" % dataset_id
 

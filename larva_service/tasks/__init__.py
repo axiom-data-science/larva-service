@@ -1,1 +1,1 @@
-from larva_service.tasks import larva, dataset, shoreline
+from larva_service.tasks import local, dataset, shoreline, distributed

@@ -1,7 +1,6 @@
 DEBUG = True
 LOG_FILE = True
 TESTING = True
-DISTRIBUTE = False
 
 OUTPUT_PATH = "/data/lm/tests/output"
 CACHE_PATH = "/data/lm/tests/cache"
