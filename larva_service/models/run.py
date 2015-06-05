@@ -56,7 +56,7 @@ class Run(Document):
         'email'              : unicode,   # Email of the person who ran the model
         'output'             : list,
         'task_result'        : unicode,
-        'trackline'          : unicode,
+        'trackline'          : unicode,   # GeoJSON
         'ended'              : datetime,
         'shoreline_path'     : unicode,
         'shoreline_feature'  : unicode
@@ -76,7 +76,7 @@ class Run(Document):
         try:
             self.set_trackline()
         except:
-            app.logger.warning("Could not process trackline results.  URL may be invalid?")
+            app.logger.exception("Could not process trackline results.")
 
         if Job.exists(self.task_id, connection=redis_connection):
             job = Job.fetch(self.task_id, connection=redis_connection)
@@ -87,10 +87,16 @@ class Run(Document):
     def set_trackline(self):
         if self.trackline is None:
             for filepath in self.output:
-                if os.path.splitext(os.path.basename(filepath))[1] == ".geojson":
-                    # Get GeoJSON trackline and cache locally as WKT
-                    t = urllib2.urlopen(filepath)
-                    self.trackline = unicode(asShape(geojson.loads(t.read())).wkt)
+                if os.path.basename(filepath) in ['trackline.geojson', 'simple_trackline.geojson']:
+                    # Get GeoJSON trackline and cache locally as GeoJSON
+                    try:
+                        t = urllib2.urlopen(filepath)
+                        self.trackline = unicode(geojson.loads(t.read()))
+                    except ValueError:
+                        t = open(filepath, 'r')
+                        self.trackline = unicode(geojson.loads(t.read()))
+                        t.close()
+
         return self.trackline
 
     def status(self):
@@ -131,9 +137,10 @@ class Run(Document):
 
     def google_maps_trackline(self):
         if self.trackline:
-            geo = loads(self.trackline)
-            return geo.coords
-
+            try:
+                return list(geojson.utils.coords(geojson.loads(self.trackline)))
+            except AttributeError:
+                return []
         return []
 
     def google_maps_coordinates(self):
@@ -184,7 +191,9 @@ class Run(Document):
         elif ext == ".geojson":
             if "particle_tracklines" in name:
                 file_type = "Particle Tracklines (GeoJSON)"
-            elif "center_trackline" in name:
+            elif "simple_trackline" in name:
+                file_type = "Simple Trackline (GeoJSON)"
+            elif "full_trackline" in name:
                 file_type = "Center Trackline (GeoJSON)"
             elif "particle_multipoint" in name:
                 file_type = "Particle MultiPoint (GeoJSON)"
