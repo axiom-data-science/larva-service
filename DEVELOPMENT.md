@@ -37,3 +37,67 @@ Assumes you have:
 
 ### Start the local server
     $ foreman start
+
+
+
+## Sample Runs
+
+#### Super quick
+```
+{
+    "name" : "Sample interp run",
+    "behavior": "https://larvamap.s3.amazonaws.com/resources/501c40e740a83e0006000000.json",
+    "duration": 2,
+    "email": "user@example.com",
+    "geometry": "POINT (-147 60.75)",
+    "horiz_chunk": 2,
+    "horiz_dispersion": 0.01,
+    "hydro_path": "/data/lm/datasets/pws/*.nc",
+    "particles": 10,
+    "release_depth": -2,
+    "start": 1388538000000,
+    "time_chunk": 24,
+    "timestep": 3600,
+    "vert_dispersion": 0.01
+}
+```
+
+#### Longer
+```
+{
+    "name" : "Sample interp run",
+    "behavior": "https://larvamap.s3.amazonaws.com/resources/501c40e740a83e0006000000.json",
+    "duration": 20,
+    "email": "user@example.com",
+    "geometry": "POINT (-147 60.75)",
+    "horiz_chunk": 2,
+    "horiz_dispersion": 0.01,
+    "hydro_path": "/data/lm/datasets/pws/*.nc",
+    "particles": 10,
+    "release_depth": -2,
+    "start": 1388538000000,
+    "time_chunk": 24,
+    "timestep": 3600,
+    "vert_dispersion": 0.01
+}
+```
+
+#### Over DAP
+```
+{
+    "name" : "Sample interp run",
+    "behavior": "https://larvamap.s3.amazonaws.com/resources/501c40e740a83e0006000000.json",
+    "duration": 1,
+    "email": "user@example.com",
+    "geometry": "POINT (-147 60.75)",
+    "horiz_chunk": 2,
+    "horiz_dispersion": 0.01,
+    "hydro_path": "http://thredds.axiomalaska.com/thredds/dodsC/PWS_DAS.nc",
+    "particles": 1,
+    "release_depth": -2,
+    "start": 1388538000000,
+    "time_chunk": 24,
+    "timestep": 3600,
+    "vert_dispersion": 0.01
+}
+```
