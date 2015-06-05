@@ -1,5 +1,5 @@
 from flask import render_template, redirect, url_for, request, flash, jsonify
-from larva_service import app, db, dataset_queue
+from larva_service import app, db, dataset_queue, redis_connection
 import json
 from larva_service.models import remove_mongo_keys
 from larva_service.views.helpers import requires_auth
@@ -72,7 +72,7 @@ def delete_dataset(dataset_id, format=None):
         format = 'html'
 
     dataset = db.Dataset.find_one( { '_id' : dataset_id } )
-    cancel_job(dataset.task_id)
+    cancel_job(dataset.task_id, connection=redis_connection)
     dataset.delete()
 
     if format == 'json':

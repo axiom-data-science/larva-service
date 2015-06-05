@@ -1,5 +1,5 @@
 from flask import render_template, redirect, url_for, request, flash, jsonify
-from larva_service import app, db, shoreline_queue
+from larva_service import app, db, shoreline_queue, redis_connection
 from larva_service.models.shoreline import Shoreline
 from larva_service.tasks.shoreline import get_info
 from larva_service.views.helpers import requires_auth
@@ -85,7 +85,7 @@ def delete_shoreline(shoreline_id, format=None):
         format = 'html'
 
     shoreline = db.Shoreline.find_one( { '_id' : shoreline_id } )
-    cancel_job(shoreline.task_id)
+    cancel_job(shoreline.task_id, connection=redis_connection)
     shoreline.delete()
 
     if format == 'json':

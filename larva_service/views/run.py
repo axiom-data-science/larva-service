@@ -5,7 +5,7 @@ from rq import cancel_job
 from pymongo import DESCENDING
 from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, abort
 
-from larva_service import app, db, run_queue
+from larva_service import app, db, run_queue, redis_connection
 from larva_service.models import remove_mongo_keys
 from larva_service.views.helpers import requires_auth
 from larva_service.tasks.larva import run as larva_run
@@ -65,7 +65,7 @@ def delete_run(run_id, format=None):
         format = 'html'
 
     run = db.Run.find_one( { '_id' : run_id } )
-    cancel_job(run.task_id)
+    cancel_job(run.task_id, connection=redis_connection)
     run.delete()
 
     if format == 'json':
