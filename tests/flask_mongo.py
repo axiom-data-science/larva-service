@@ -3,6 +3,7 @@ import larva_service
 from larva_service import app
 from mongokit import Connection
 
+
 class FlaskMongoTestCase(unittest.TestCase):
     def setUp(self):
         app.config['TESTING'] = True
