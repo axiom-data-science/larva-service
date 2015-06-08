@@ -84,8 +84,9 @@ def run(run_id):
                 ex.H5GDALShapefile
             ]
 
-            def save_progress(stop, progress_deque):
+            def save_progress(stop, progress_deque, logger):
                 while True:
+
                     if stop():
                         break
                     try:
@@ -105,7 +106,8 @@ def run(run_id):
                     except Exception:
                         raise
 
-                    time.sleep(0.001)
+                    # Relax
+                    time.sleep(0.1)
 
             # Set up Logger
             from paegan.logger.progress_handler import ProgressHandler
@@ -115,7 +117,10 @@ def run(run_id):
             # Logging handler
             queue = multiprocessing.Queue(-1)
             logger.setLevel(logging.PROGRESS)
-            mphandler = MultiProcessingLogHandler(log_file, queue)
+            if app.config.get("DEBUG") is True:
+                mphandler = MultiProcessingLogHandler(log_file, queue, stream=True)
+            else:
+                mphandler = MultiProcessingLogHandler(log_file, queue)
             mphandler.setLevel(logging.PROGRESS)
             formatter = logging.Formatter('[%(asctime)s] - %(levelname)s - %(name)s - %(processName)s - %(message)s')
             mphandler.setFormatter(formatter)
@@ -128,8 +133,7 @@ def run(run_id):
             logger.addHandler(progress_handler)
 
             stop_log_listener = False
-            pl = threading.Thread(name="ProgressUpdater", target=save_progress, args=(lambda: stop_log_listener, progress_deque,))
-            pl.daemon = True
+            pl = threading.Thread(name="ProgressUpdater", target=save_progress, args=(lambda: stop_log_listener, progress_deque, logger,))
             pl.start()
 
             model = CachingModelController(
@@ -167,19 +171,18 @@ def run(run_id):
 
         finally:
 
+            # Stop progress log handler
+            stop_log_listener = True
+            # Wait for log listener to exit
+            pl.join()
+
             # Close and remove the handlers so we can use the log file without a file lock
             for hand in list(logger.handlers):
                 logger.removeHandler(hand)
                 hand.flush()
                 hand.close()
-                del hand
-
-            # Stop mp log handler
-            mphandler.close()
-            # Stop progress log handler
-            stop_log_listener = True
-            # Wait for log listener to exit
-            pl.join()
+            queue.close()
+            queue.join_thread()
 
             # LOOK: Without this, the destination log file (model.log) is left
             # with an open file handler.  I'm baffled and can't figure out why.
@@ -223,11 +226,11 @@ def run(run_id):
             else:
                 result_files = output_files
 
+            job.meta["updated"]  = datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.utc)
+            job.save()
+
             # Set output fields
             run.output = result_files
             run.ended = datetime.utcnow()
             run.compute()
             run.save()
-
-            job.meta["updated"]  = datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.utc)
-            job.save()
