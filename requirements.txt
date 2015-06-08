@@ -11,5 +11,5 @@ rq==0.5.3
 rq-dashboard==0.3.4
 boto
 geojson
-paegan-transport>=1.0
+paegan-transport>=1.0.1
 paegan-viz
