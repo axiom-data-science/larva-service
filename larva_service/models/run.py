@@ -217,7 +217,7 @@ class Run(Document):
 
     def run_config(self):
 
-        skip_keys = ['_id', 'cached_behavior', 'created', 'task_id', 'output', 'trackline', 'task_result', 'ended']
+        skip_keys = ['_id', 'cached_behavior', 'created', 'task_id', 'output', 'trackline', 'task_result', 'started', 'ended']
         d = {}
         for key, value in self.iteritems():
             if key not in skip_keys:
