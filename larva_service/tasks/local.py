@@ -229,12 +229,5 @@ def run(run_id):
             run.compute()
             run.save()
 
-            del formatter
-            del mphandler
-            del progress_handler
-            del logger
-            del model
-            del progress_deque
-
             job.meta["updated"]  = datetime.utcnow().replace(tzinfo=pytz.utc).astimezone(pytz.utc)
             job.save()

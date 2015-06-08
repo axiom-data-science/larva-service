@@ -236,5 +236,3 @@ def run(run_id):
             run.ended = datetime.utcnow()
             run.compute()
             run.save()
-
-            del model
