@@ -175,12 +175,10 @@ def run(run_id):
             app.logger.exception("Failed to run model")
             job.meta["message"]  = e.message
             job.meta["outcome"] = "failed"
-            run.task_result = "failed"
 
         else:
             job.meta["message"]  = "Complete"
             job.meta["outcome"] = "success"
-            run.task_result = "success"
             job.meta["progress"] = 100
 
         finally:
