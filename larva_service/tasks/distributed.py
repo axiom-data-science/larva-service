@@ -130,7 +130,8 @@ def run(run_id):
                         except Exception:
                             logger.info("Got strange result: %s" % msg["data"])
 
-                    time.sleep(0.001)
+                    # Relax
+                    time.sleep(1)
 
                 pubsub.unsubscribe()
                 pubsub.close()
