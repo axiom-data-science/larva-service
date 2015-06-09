@@ -72,7 +72,7 @@ class Run(Document):
                         'time_method' : u'interp' }
     migration_handler = RunMigration
 
-    restrict_loading = ["output", "task_result", "trackline", "task_id", "created", "cached_behavior", "output", "ended"]
+    restrict_loading = ["output", "task_result", "trackline", "task_id", "created", "cached_behavior", "output", "started", "ended"]
 
     def compute(self):
         """
