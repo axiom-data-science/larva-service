@@ -107,7 +107,7 @@ def run(run_id):
                         raise
 
                     # Relax
-                    time.sleep(0.1)
+                    time.sleep(0.01)
 
             # Set up Logger
             from paegan.logger.progress_handler import ProgressHandler

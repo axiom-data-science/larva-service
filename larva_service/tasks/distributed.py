@@ -131,7 +131,7 @@ def run(run_id):
                             logger.info("Got strange result: %s" % msg["data"])
 
                     # Relax
-                    time.sleep(1)
+                    time.sleep(0.01)
 
                 pubsub.unsubscribe()
                 pubsub.close()
