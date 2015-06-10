@@ -112,7 +112,7 @@ class Run(Document):
     def status(self):
         if self.task_result is not None and self.task_result != "":
             return self.task_result
-        elif Job.exists(self.task_id, connection=redis_connection):
+        elif self.task_id and Job.exists(self.task_id, connection=redis_connection):
             job = Job.fetch(self.task_id, connection=redis_connection)
             return job.status
         else:
@@ -121,7 +121,7 @@ class Run(Document):
     def progress(self):
         if self.task_result is not None and self.task_result != "":
             return 100
-        elif Job.exists(self.task_id, connection=redis_connection):
+        elif self.task_id and Job.exists(self.task_id, connection=redis_connection):
             job = Job.fetch(self.task_id, connection=redis_connection)
             return job.meta.get("progress", 0)
         else:
@@ -139,7 +139,7 @@ class Run(Document):
     def last_progress_update(self):
         if self.task_result is not None and self.task_result != "":
             return "run complete"
-        elif Job.exists(self.task_id, connection=redis_connection):
+        elif self.task_id and Job.exists(self.task_id, connection=redis_connection):
             job = Job.fetch(self.task_id, connection=redis_connection)
             return job.meta.get("updated", None)
         else:
