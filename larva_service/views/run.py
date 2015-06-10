@@ -6,11 +6,48 @@ from rq import cancel_job
 from pymongo import DESCENDING
 from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, abort
 
+
 from larva_service import app, db, run_queue, redis_connection
 from larva_service.models import remove_mongo_keys
+from larva_service.models.run import Run
+
 from larva_service.views.helpers import requires_auth
 from larva_service.tasks.local import run as local_run
 from larva_service.tasks.distributed import run as distributed_run
+
+from flask_wtf import Form
+from wtforms.fields import StringField, RadioField, TextAreaField
+from wtforms.fields.html5 import URLField, DateField, IntegerField, DecimalField, EmailField
+from wtforms.validators import DataRequired, url, Email, NumberRange, Optional, InputRequired
+
+
+def dataset_choices():
+    with app.app_context():
+        return [(s.location, '{}: {:%b %d %Y} to {:%b %d %Y}'.format(s.name, s.starting, s.ending) ) for s in db.Dataset.find().sort('name')]
+
+
+def shoreline_choices():
+    with app.app_context():
+        return [(s.path, s.name) for s in db.Shoreline.find().sort('name')]
+
+
+class RunForm(Form):
+    name             = StringField('Name', validators=[ DataRequired() ], description='A unique and human readable name for this run, ie. "Montague Island 2006 - PWS Hindcast"')
+    behavior         = URLField('Behavior', validators=[ Optional(), url() ], description='URL to JSON Behavior file.  See http://behavior.larvamap.axiomdatascience.com/')
+    particles        = IntegerField('Particles', validators=[ NumberRange(min=1, max=200, message="Must be between 1 and 200.") ], description="The number of particles to force")
+    dataset          = RadioField('Hydro model', validators=[ DataRequired() ], choices=dataset_choices())
+    geometry         = TextAreaField('Starting position', validators=[ DataRequired() ], description="Point or Polygon geometry as a WKT string. Create using http://arthur-e.github.io/Wicket/sandbox-gmaps3.html.")
+    release_depth    = DecimalField("Release depth", validators=[ InputRequired() ], description="Starting depth, in meters")
+    start            = DateField('Start', validators=[ DataRequired() ])
+    duration         = IntegerField('Duration', validators=[ DataRequired() ], description='Duration of run, in days')
+    timestep         = IntegerField('Timestep', validators=[ DataRequired() ], default=3600, description='Seconds between movemement calculations')
+    horiz_dispersion = DecimalField('Horizonal Dispersion', default=0., description='Horizontal dispersion coeficcient (m/s)')
+    vert_dispersion  = DecimalField('Vertical Dispersion', default=0., description='Vertical dispersion coeficcient (m/s)')
+    time_chunk       = IntegerField('Time cache', default=Run.default_values['time_chunk'], description="Tune the local Time cache when using DAP models")
+    horiz_chunk      = IntegerField('Grid cache', default=Run.default_values['horiz_chunk'], description="Tune the local Grid cache when using DAP models")
+    time_method      = RadioField('Time method', choices=[('nearest', 'Nearest'), ('interp', 'Interpolate')], default=Run.default_values['time_method'])
+    email            = EmailField('Email', validators=[ Email() ])
+    shoreline        = RadioField('Shoreline', validators=[ DataRequired() ], choices=shoreline_choices())
 
 
 @app.route('/run', methods=['GET', 'POST'])
@@ -59,6 +96,69 @@ def run_larva_model(format=None):
         return redirect(url_for('runs'))
     elif format == 'json':
         return jsonify( { 'results' : unicode(run['_id']) } )
+
+
+@app.route('/submit', methods=['GET', 'POST'])
+def submit():
+
+    form = RunForm()
+
+    if not form.validate_on_submit():
+        return render_template('submit.html', form=form)
+
+    try:
+        # Translate from Form to the JSON that can be POSTed to /run here
+        config_dict = dict()
+
+        # Shoreline
+        shoreline = db.Shoreline.find_one(name=form.shoreline.data)
+        config_dict['shoreline_path'] = shoreline.path
+        if shoreline.feature_name:
+            config_dict['shoreline_feature'] = shoreline.feature_name
+
+        # Dataset
+        dataset = db.Dataset.find_one(name=form.dataset.data)
+        config_dict['hydro_path'] = dataset.location
+
+        if form.behavior.data:
+            config_dict['behavior'] = form.behavior.data
+
+        config_dict['name'] = form.name.data
+        config_dict['particles'] = form.particles.data
+        config_dict['geometry'] = form.geometry.data
+        config_dict['release_depth'] = form.release_depth.data
+        config_dict['release_depth'] = form.release_depth.data
+        config_dict['start'] = form.start.data
+        config_dict['duration'] = form.duration.data
+        config_dict['timestep'] = form.timestep.data
+        config_dict['horiz_dispersion'] = form.horiz_dispersion.data
+        config_dict['vert_dispersion'] = form.vert_dispersion.data
+        config_dict['time_chunk'] = form.time_chunk.data
+        config_dict['horiz_chunk'] = form.horiz_chunk.data
+        config_dict['time_method'] = form.time_method.data
+        config_dict['email'] = form.email.data
+
+        app.logger.info(config_dict)
+
+    except BaseException as e:
+        flash(e.message, 'info')
+        return render_template('submit.html', form=form)
+
+    else:
+        run = db.Run()
+        run.load_run_config(config_dict)
+        run.save()
+        # Enqueue
+        if urlparse(run.hydro_path).scheme != '':
+            # DAP, use the CachingModelController
+            job = run_queue.enqueue_call(func=local_run, args=(unicode(run['_id']),))
+        else:
+            # Local file path, use the DistributedModelController
+            job = run_queue.enqueue_call(func=distributed_run, args=(unicode(run['_id']),))
+        run.task_id = unicode(job.id)
+        run.save()
+        flash('Run created', 'success')
+        return redirect(url_for('runs'))
 
 
 @app.route('/runs/<ObjectId:run_id>/delete', methods=['GET', 'DELETE'])
