@@ -104,6 +104,11 @@ def run(run_id):
                 formatter = logging.Formatter('[%(asctime)s] - %(levelname)s - %(name)s - %(processName)s - %(message)s')
                 handler.setFormatter(formatter)
                 logger.addHandler(handler)
+                if app.config.get("DEBUG") is True:
+                    st = logging.StreamHandler()
+                    st.setLevel(logging.PROGRESS)
+                    st.setFormatter(formatter)
+                    logger.addHandler(st)
 
                 pubsub = r.pubsub()
                 pubsub.subscribe(log_channel)
