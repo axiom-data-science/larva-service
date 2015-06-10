@@ -35,6 +35,10 @@ class RunMigration(DocumentMigration):
         self.target = {'started': {'$exists': False}}
         self.update = {'$set': {'started': ''}}
 
+    def allmigration06__add_final_message_fields(self):
+        self.target = {'final_message': {'$exists': False}}
+        self.update = {'$set': {'final_message': ''}}
+
 
 class Run(Document):
     __collection__ = 'runs'
@@ -64,7 +68,8 @@ class Run(Document):
         'started'            : datetime,
         'ended'              : datetime,
         'shoreline_path'     : unicode,
-        'shoreline_feature'  : unicode
+        'shoreline_feature'  : unicode,
+        'final_message'      : unicode,   # Message from the Job
     }
     default_values = {  'created': datetime.utcnow,
                         'time_chunk'  : 10,
@@ -86,6 +91,7 @@ class Run(Document):
         if Job.exists(self.task_id, connection=redis_connection):
             job = Job.fetch(self.task_id, connection=redis_connection)
             self.task_result = unicode(job.meta.get("outcome", ""))
+            self.final_message = unicode(job.meta.get("message", ""))
 
         self.save()
 
@@ -123,9 +129,9 @@ class Run(Document):
             return "unknown"
 
     def message(self):
-        if self.task_result is not None and self.task_result != "":
-            return self.task_result
-        elif Job.exists(self.task_id, connection=redis_connection):
+        if self.final_message is not None and self.final_message != "":
+            return self.final_message
+        elif self.task_id and Job.exists(self.task_id, connection=redis_connection):
             job = Job.fetch(self.task_id, connection=redis_connection)
             return job.meta.get("message", None)
         else:
