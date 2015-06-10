@@ -9,6 +9,7 @@ from paegan.cdm.dataset import CommonDataset
 from shapely.geometry import box
 from rq.job import Job
 
+
 class Dataset(Document):
     __collection__ = 'datasets'
     use_dot_notation = True

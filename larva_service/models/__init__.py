@@ -1,5 +1,6 @@
 from larva_service.models import run, dataset, shoreline
 
+
 def remove_mongo_keys(d, extra=None):
 
     remove_keys = ['_id','_collection','_database','_keywords']

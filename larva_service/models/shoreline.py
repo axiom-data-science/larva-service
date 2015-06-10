@@ -9,10 +9,12 @@ from paegan.transport.shoreline import Shoreline as PTShoreline
 from shapely.geometry import box
 from rq.job import Job
 
+
 class RunMigration(DocumentMigration):
     def allmigration01__add_path_type_field(self):
         self.target = {'path_type':{'$exists': False}}
         self.update = {'$set':{'path_type':u''}}
+
 
 class Shoreline(Document):
     __collection__ = 'shorelines'

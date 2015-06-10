@@ -20,7 +20,7 @@ def admin():
 
 @requires_auth
 @app.route('/jobs', methods=['GET'])
-def jobs():        
+def jobs():
     return redirect('/rq')
 
 
