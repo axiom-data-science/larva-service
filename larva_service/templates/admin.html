@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+
+{% block page %}
+
+<div class="row">
+    <dl class="dl-horizontal">
+        {% for key, value in environment|dictsort %}
+            <dt>{{ key }} </dt>
+            <dd>{{ value }}</dd>
+        {% endfor %}
+    </dl>
+</div>
+
+{% endblock %}

@@ -5,11 +5,17 @@ from larva_service.views.helpers import requires_auth
 
 @app.route('/', methods=['GET'])
 def index():
+    return render_template('index.html')
+
+
+@requires_auth
+@app.route('/admin', methods=['GET'])
+def admin():
 
     show_keys = ['OUTPUT_PATH', 'SHORE_PATH', 'BATHY_PATH', 'CACHE_PATH', 'DEBUG', 'TESTING', 'NON_S3_OUTPUT_URL']
     environ = { g: v for g, v in app.config.items() if g in show_keys }
 
-    return render_template('index.html', environment=environ)
+    return render_template('admin.html', environment=environ)
 
 
 @requires_auth
