@@ -101,3 +101,20 @@ Assumes you have:
     "vert_dispersion": 0.01
 }
 ```
+
+#### Production
+```
+{
+    "name" : "PDX Test - 10 day run",
+    "duration": 10,
+    "email": "kyle@axiomdatascience.com",
+    "geometry": "POINT (-147 60.75)",
+    "horiz_dispersion": 0.01,
+    "hydro_path": "/mnt/gluster/data/netCDF/pws_das/processed/pws_das_*.nc",
+    "particles": 100,
+    "release_depth": -2,
+    "start": "2014-06-01T01:00:00",
+    "timestep": 3600,
+    "vert_dispersion": 0.01
+}
+```
