@@ -1,8 +1,7 @@
 from mongokit import Document, DocumentMigration
 from larva_service import db, app, redis_connection
 from flask import url_for
-from datetime import datetime
-from dateutil.parser import parse as dateparse
+from datetime import datetime, date
 import json
 import urllib2
 import pytz
@@ -235,6 +234,7 @@ class Run(Document):
         return d
 
     def load_run_config(self, run):
+        from paegan.utils.datetime import datetime_parser
         # Set the 1:1 relationship between the config and this object
         for key, value in run.iteritems():
 
@@ -243,26 +243,27 @@ class Run(Document):
                 continue
 
             if key == 'start':
-                # Text DateTime
-                try:
-                    # Convert to UTC
-                    d = dateparse(value)
-                    if d.tzinfo is None:
-                        d = d.replace(tzinfo=pytz.utc)
-                    self[key] = d.astimezone(pytz.utc)
-                except:
-                     # Timestamp DateTime  (assume in UTC)
-                    try:
-                        self[key] = datetime.fromtimestamp(value / 1000, pytz.utc)
-                    except:
-                        raise
+                if isinstance(value, datetime):
+                    d = value
+                elif isinstance(value, date):
+                    d = datetime.combine(value, datetime.min.time())
+                elif isinstance(value, basestring):
+                    d = datetime_parser(value)
+                elif isinstance(value, (int, float)):
+                    d = datetime.fromtimestamp(value / 1000, pytz.utc)
+
+                # Convert to UTC
+                if d.tzinfo is None:
+                    d = d.replace(tzinfo=pytz.utc)
+                self[key] = d.astimezone(pytz.utc)
 
             elif key == 'release_depth' or key == 'horiz_dispersion' or key == 'vert_dispersion':
                 self[key] = float(value)
 
             else:
                 try:
-                    setattr(self, key, value)
+                    if value is not None:
+                        setattr(self, key, value)
                 except Exception:
                     app.logger.exception("Unknown run config key: %s.  Ignoring." % key)
 
