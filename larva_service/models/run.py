@@ -76,7 +76,7 @@ class Run(Document):
                         'time_method' : u'interp' }
     migration_handler = RunMigration
 
-    restrict_loading = ["output", "task_result", "trackline", "task_id", "created", "cached_behavior", "output", "started", "ended"]
+    restrict_loading = ["output", "task_result", "trackline", "task_id", "created", "cached_behavior", "output", "started", "ended", "final_message", "_id"]
 
     def compute(self):
         """
@@ -222,7 +222,7 @@ class Run(Document):
 
     def run_config(self):
 
-        skip_keys = ['_id', 'cached_behavior', 'created', 'task_id', 'output', 'trackline', 'task_result', 'started', 'ended']
+        skip_keys = ['_id', 'cached_behavior', 'created', 'task_id', 'output', 'trackline', 'task_result', 'started', 'ended', 'final_message']
         d = {}
         for key, value in self.iteritems():
             if key not in skip_keys:
