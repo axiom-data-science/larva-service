@@ -47,7 +47,7 @@ Assumes you have:
 {
     "name" : "Sample interp run",
     "behavior": "https://larvamap.s3.amazonaws.com/resources/501c40e740a83e0006000000.json",
-    "duration": 2,
+    "duration": 10,
     "email": "user@example.com",
     "geometry": "POINT (-147 60.75)",
     "horiz_chunk": 2,
@@ -55,7 +55,7 @@ Assumes you have:
     "hydro_path": "/data/lm/datasets/pws/*.nc",
     "particles": 10,
     "release_depth": -2,
-    "start": 1388538000000,
+    "start": "2014-01-01T01:00:00",
     "time_chunk": 24,
     "timestep": 3600,
     "vert_dispersion": 0.01
@@ -75,7 +75,7 @@ Assumes you have:
     "hydro_path": "/data/lm/datasets/pws/*.nc",
     "particles": 10,
     "release_depth": -2,
-    "start": 1388538000000,
+    "start": "2014-01-01T01:00:00",
     "time_chunk": 24,
     "timestep": 3600,
     "vert_dispersion": 0.01
@@ -95,7 +95,7 @@ Assumes you have:
     "hydro_path": "http://thredds.axiomalaska.com/thredds/dodsC/PWS_DAS.nc",
     "particles": 1,
     "release_depth": -2,
-    "start": 1388538000000,
+    "start": "2014-01-01T01:00:00",
     "time_chunk": 24,
     "timestep": 3600,
     "vert_dispersion": 0.01
