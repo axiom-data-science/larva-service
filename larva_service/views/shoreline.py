@@ -29,7 +29,7 @@ def shorelines(format=None):
             jsonsl.append(js)
         return jsonify( { 'results' : jsonsl } )
     else:
-        flash("Response format '%s' not supported" % format)
+        flash("Response format '%s' not supported" % format, 'danger')
         return redirect(url_for('shorelines'))
 
 @app.route('/shoreline', methods=['POST'])
@@ -74,7 +74,7 @@ def show_shoreline(shoreline_id, format=None):
         jsond['_id'] = unicode(shoreline._id)
         return jsonify( jsond )
     else:
-        flash("Reponse format '%s' not supported" % format)
+        flash("Reponse format '%s' not supported" % format, 'danger')
         return redirect(url_for('shorelines'))
 
 @app.route('/shorelines/<ObjectId:shoreline_id>/delete', methods=['GET'])
@@ -91,7 +91,7 @@ def delete_shoreline(shoreline_id, format=None):
     if format == 'json':
         return jsonify( { 'status' : "success" })
     else:
-        flash("Shoreline deleted")
+        flash("Shoreline deleted", 'danger')
         return redirect(url_for('shorelines'))
 
 @app.route('/shorelines/clear', methods=['GET'])
@@ -99,4 +99,3 @@ def delete_shoreline(shoreline_id, format=None):
 def clear_shorelines():
     db.drop_collection("shorelines")
     return redirect(url_for('shorelines'))
-

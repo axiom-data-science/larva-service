@@ -2,15 +2,17 @@
 {% extends "layout.html" %}
 
 {% block subnav %}
-    <div class="subnav subnav-fixed">
+    <div class="navbar navbar-default">
         <div class="container">
-            <ul class="nav nav-pills">
-                <form method="POST" action="{{ url_for('add_dataset') }}" class="navbar-form pull-left">
-                  <input type="textarea" class="span4" name="name" id="name" placeholder="Name of dataset"></input>
-                  <input type="textarea" class="span4" name="location" id="location" placeholder="Paste DAP URL here"></input>
-                  <input type="submit" value="Add Dataset" class="btn"></input>
-                </form>
-            </ul>
+            <form method="POST" action="{{ url_for('add_dataset') }}" class="navbar-form navbar-left">
+                <div class="form-group">
+                    <input type="text" class="form-control col-md-3" name="name" id="name" placeholder="Name of dataset"></input>
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-control col-md-5" name="location" id="location" placeholder="Paste DAP URL here"></input>
+                </div>
+                <button type="submit" class="btn btn-default">Add Dataset</button>
+            </form>
         </div>
     </div>
 {% endblock %}

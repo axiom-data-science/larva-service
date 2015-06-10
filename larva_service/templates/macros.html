@@ -2,12 +2,12 @@
     {%- if st == "finished" %}
         {{- 'success' -}}
     {%- elif st == "failed" -%}
-        {{- 'warning' -}}
+        {{- 'danger' -}}
     {%- elif st == "started" -%}
         {{- 'info' -}}
     {%- elif st == "success" -%}
         {{- 'success' -}}
     {%- else -%}
-        {{- 'important' -}}
+        {{- 'warning' -}}
     {%- endif -%}
 {%- endmacro -%}

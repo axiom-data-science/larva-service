@@ -40,7 +40,7 @@ def datasets(format=None):
             jsond.append(js)
         return jsonify( { 'results' : jsond } )
     else:
-        flash("Response format '%s' not supported" % format)
+        flash("Response format '%s' not supported" % format, 'warning')
         return redirect(url_for('datasets'))
 
 @app.route('/datasets/<ObjectId:dataset_id>', methods=['GET'])
@@ -61,7 +61,7 @@ def show_dataset(dataset_id, format=None):
         jsond['_id'] = unicode(dataset._id)
         return jsonify( jsond )
     else:
-        flash("Reponse format '%s' not supported" % format)
+        flash("Reponse format '%s' not supported" % format, 'warning')
         return redirect(url_for('datasets'))
 
 @app.route('/datasets/<ObjectId:dataset_id>/delete', methods=['GET'])
@@ -78,7 +78,7 @@ def delete_dataset(dataset_id, format=None):
     if format == 'json':
         return jsonify( { 'status' : "success" })
     else:
-        flash("Dataset deleted")
+        flash("Dataset deleted", 'success')
         return redirect(url_for('datasets'))
 
 @app.route('/datasets/<ObjectId:dataset_id>/scan', methods=['GET'])
@@ -95,7 +95,7 @@ def scan_dataset(dataset_id, format=None):
     if format == 'json':
         return jsonify( { 'status' : "success" })
     else:
-        flash("Dataset updated")
+        flash("Dataset updated", 'success')
         return redirect(url_for('datasets'))
 
 @app.route('/datasets/<ObjectId:dataset_id>/schedule', methods=['GET'])
@@ -115,7 +115,7 @@ def schedule_dataset(dataset_id, format=None):
     if format == 'json':
         return jsonify( { 'status' : "success" })
     else:
-        flash("Dataset scheduled for periodic update")
+        flash("Dataset scheduled for periodic update", 'success')
         return redirect(url_for('datasets'))
 
 @app.route('/datasets/clear', methods=['GET'])

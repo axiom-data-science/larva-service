@@ -84,7 +84,7 @@
     </table>
 
     <div class="row">
-        <dl class="dl-horizontal span8">
+        <dl class="dl-horizontal col-md-8">
             {% for key, value in run|dictsort %}
                 {% if key != 'cached_behavior' and key != 'output' and key != 'trackline' and key != 'task_result' and key != '_id' and key != 'task_id' and key != 'ended' %}
                     <dt>{{ key }} </dt>
@@ -93,7 +93,7 @@
             {% endfor %}
         </dl>
 
-        <div id="map_canvas" class="span4" style="height: 300px;"></div>
+        <div id="map_canvas" class="col-md-4" style="height: 300px;"></div>
     </div>
 
     <h2>output</h2>
@@ -106,19 +106,23 @@
         {% endfor %}
     </dl>
 
+    {% if run.trackline %}
     <h2>geojson center trackline</h2>
     <pre>
 {{ run.trackline|safe }}
     </pre>
+    {% endif %}
 
     <h2>run_config</h2>
     <pre>
 {{ run_config|safe }}
     </pre>
 
+    {% if run.cached_behavior %}
     <h2>cached_behavior</h2>
     <pre>
 {{ cached_behavior|safe }}
     </pre>
+    {% endif %}
 
 {% endblock %}

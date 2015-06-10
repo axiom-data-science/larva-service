@@ -2,18 +2,18 @@
 {% extends "layout.html" %}
 
 {% block subnav %}
-    <div class="subnav subnav-fixed">
+    <div class="navbar navbar-default">
         <div class="container">
-            <ul class="nav nav-pills">
+            <ul class="nav navbar-nav">
                 <li><a href="{{ url_for('clear_runs') }}">Clear runs</a></li>
-                <li>
-                    <form method="POST" action="{{ url_for('run_larva_model') }}" class="navbar-form pull-left">
-                        <input type="textarea" class="span4" name="config" id="config" placeholder="Paste JSON config here to create a manual run"></input>
-                        <input type="submit" value="Run Larva Model" class="btn"></input>
-
-                    </form>
-                </li>
             </ul>
+            <form method="POST" action="{{ url_for('run_larva_model') }}" class="navbar-form navbar-left">
+                <div class="form-group">
+                    <input type="textarea" class="form-control" name="config" id="config" placeholder="Paste JSON config here to create a manual run"></input>
+                </div>
+                <button type="submit" class="btn btn-default">Run</button>
+            </form>
+            </li>
         </div>
     </div>
 {% endblock %}
@@ -52,54 +52,4 @@
          </tbody>
     </table>
 
-    <div class="row">
-        <div class='span6'>
-            <h3>Example JSON run (interp time):</h3>
-            <pre>
-{
-    "name" : "Sample interp run",
-    "behavior": "https://larvamap.s3.amazonaws.com/resources/501c40e740a83e0006000000.json", 
-    "duration": 1, 
-    "email": "user@example.com", 
-    "geometry": "POINT (-147 60.75)", 
-    "horiz_chunk": 2, 
-    "horiz_dispersion": 0.01, 
-    "hydro_path": "http://thredds.axiomalaska.com/thredds/dodsC/PWS_L2_FCST.nc", 
-    "particles": 10, 
-    "release_depth": -2, 
-    "shoreline_path": "http://geo.asascience.com/geoserver/shorelines/ows",
-    "shoreline_feature": "shorelines:10m_land_polygons",
-    "start": 1345161600000, 
-    "time_chunk": 24, 
-    "timestep": 3600, 
-    "vert_dispersion": 0.01
-}
-            </pre>
-        </div>
-
-        <div class='span6'>
-            <h3>Example JSON run (nearest time):</h3>
-            <pre>
-{
-    "name" : "Sample nearest run",
-    "behavior": "https://larvamap.s3.amazonaws.com/resources/501c40e740a83e0006000000.json", 
-    "duration": 1, 
-    "email": "user@example.com", 
-    "geometry": "POINT (-147 60.75)", 
-    "horiz_chunk": 2, 
-    "horiz_dispersion": 0.01, 
-    "hydro_path": "http://thredds.axiomalaska.com/thredds/dodsC/PWS_L2_FCST.nc", 
-    "particles": 10, 
-    "release_depth": -2, 
-    "shoreline_path": "http://geo.asascience.com/geoserver/shorelines/ows",
-    "shoreline_feature": "shorelines:10m_land_polygons",
-    "start": 1345161600000, 
-    "time_chunk": 24, 
-    "timestep": 3600, 
-    "vert_dispersion": 0.01,
-    "time_method": "nearest"
-}
-            </pre>
-        </div>
-    </div>
 {% endblock %}

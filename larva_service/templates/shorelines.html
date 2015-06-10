@@ -2,16 +2,20 @@
 {% extends "layout.html" %}
 
 {% block subnav %}
-    <div class="subnav subnav-fixed">
+    <div class="navbar navbar-default">
         <div class="container">
-            <ul class="nav nav-pills">
-                <form method="POST" action="{{ url_for('add_shoreline') }}" class="navbar-form pull-left">
-                  <input type="textarea" class="span3" name="name" id="name" placeholder="Name of shoreline"></input>
-                  <input type="textarea" class="span3" name="path" id="path" placeholder="WFS URL or file"></input>
-                  <input type="textarea" class="span3" name="feature_name" id="feature_name" placeholder="Feature name"></input>
-                  <input type="submit" value="Add Shoreline" class="btn"></input>
-                </form>
-            </ul>
+            <form method="POST" action="{{ url_for('add_shoreline') }}" class="navbar-form navbar-left">
+                <div class="form-group">
+                    <input type="text" class="form-control" name="name" id="name" placeholder="Name of shoreline"></input>
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-control" name="path" id="path" placeholder="WFS URL or file"></input>
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-control" name="feature_name" id="feature_name" placeholder="Feature name"></input>
+                </div>
+                <button type="submit" class="btn btn-default">Add Shoreline</button>
+            </form>
         </div>
     </div>
 {% endblock %}

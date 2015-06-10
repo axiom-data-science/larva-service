@@ -32,7 +32,7 @@ def run_larva_model(format=None):
     except:
         message = "Could not decode parameters"
         if format == 'html':
-            flash(message, 'error')
+            flash(message, 'danger')
             return redirect(url_for('runs'))
         elif format == 'json':
             return jsonify( { 'results' : message } )
@@ -75,7 +75,7 @@ def delete_run(run_id, format=None):
     if format == 'json':
         return jsonify( { 'status' : "success" })
     else:
-        flash("Run deleted")
+        flash("Run deleted", 'success')
         return redirect(url_for('runs'))
 
 
@@ -107,7 +107,7 @@ def runs(format=None):
             jsond.append(js)
         return jsonify( { 'results' : jsond } )
     else:
-        flash("Reponse format '%s' not supported" % format)
+        flash("Reponse format '%s' not supported" % format, 'warning')
         return redirect(url_for('runs'))
 
 
@@ -133,7 +133,7 @@ def show_run(run_id, format=None):
         jsond['output'] = list(run.output_files())
         return jsonify( jsond )
     else:
-        flash("Reponse format '%s' not supported" % format)
+        flash("Reponse format '%s' not supported" % format, 'warning')
         return redirect(url_for('runs'))
 
 
@@ -149,7 +149,7 @@ def status_run(run_id, format=None):
     if format == 'json':
         return jsonify( { 'status' : run_status })
     else:
-        flash("Reponse format '%s' not supported" % format)
+        flash("Reponse format '%s' not supported" % format, 'warning')
         return redirect(url_for('runs'))
 
 

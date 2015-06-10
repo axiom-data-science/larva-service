@@ -42,11 +42,11 @@
 
     <h1>{{ dataset.name }}</h1>
     <h2>{{ dataset.location }}</h2>
-    
+
     <hr />
 
     <div class="row">
-        <dl class="dl-horizontal span8">
+        <dl class="dl-horizontal col-md-8">
             {% for key, value in dataset|dictsort %}
                 {% if key != 'variables' and key != 'task_id' %}
                     <dt>{{ key }} </dt>
@@ -55,7 +55,7 @@
             {% endfor %}
         </dl>
 
-        <div id="map_canvas" class="span4" style="height: 300px;"></div>
+        <div id="map_canvas" class="col-md-4" style="height: 300px;"></div>
     </div>
 
     <h2>variables</h2>
