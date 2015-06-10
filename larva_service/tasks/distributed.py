@@ -173,29 +173,29 @@ def run(run_id):
             model.run(output_formats=output_formats, output_path=output_path, task_queue_call=particle_queue.enqueue_call)
 
         except Exception as e:
-            app.logger.exception("Failed to run model")
+            # Send message to the log listener to finish
+            stop_log_listener = True
+            # Wait for log listener to exit
+            pl.join()
+
+            app.logger.exception("Failed model run")
             job.meta["message"]  = e.message
             job.meta["outcome"] = "failed"
 
         else:
+            # Send message to the log listener to finish
+            stop_log_listener = True
+            # Wait for log listener to exit
+            pl.join()
+
             job.meta["message"]  = "Complete"
             job.meta["outcome"] = "success"
             job.meta["progress"] = 100
 
         finally:
 
-            # Send message to the log listener to finish
-            stop_log_listener = True
-            # Wait for log listener to exit
-            pl.join()
-
-            # LOOK: Without this, the destination log file (model.log) is left
-            # with an open file handler.  I'm baffled and can't figure out why.
-            # Try removing this and running `lsof` on the output directory.
-            # Yeah.  Mind Blown.
-            time.sleep(1)
-
             # Move logfile to output directory
+            time.sleep(1)
             shutil.move(log_file, os.path.join(output_path, 'model.log'))
 
             output_files = []

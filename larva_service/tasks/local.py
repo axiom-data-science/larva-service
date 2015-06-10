@@ -160,21 +160,26 @@ def run(run_id):
             model.run(output_formats=output_formats, output_path=output_path)
 
         except Exception as e:
+            # Stop progress log handler
+            stop_log_listener = True
+            # Wait for log listener to exit
+            pl.join()
+
             app.logger.exception("Failed to run model")
             job.meta["message"]  = e.message
             job.meta["outcome"] = "failed"
 
         else:
+            # Stop progress log handler
+            stop_log_listener = True
+            # Wait for log listener to exit
+            pl.join()
+
             job.meta["message"]  = "Complete"
             job.meta["outcome"] = "success"
             job.meta["progress"] = 100
 
         finally:
-
-            # Stop progress log handler
-            stop_log_listener = True
-            # Wait for log listener to exit
-            pl.join()
 
             # Close and remove the handlers so we can use the log file without a file lock
             for hand in list(logger.handlers):
@@ -184,10 +189,6 @@ def run(run_id):
             queue.close()
             queue.join_thread()
 
-            # LOOK: Without this, the destination log file (model.log) is left
-            # with an open file handler.  I'm baffled and can't figure out why.
-            # Try removing this and running `lsof` on the output directory.
-            # Yeah.  Mind Blown.
             time.sleep(1)
 
             # Move logfile to output directory
