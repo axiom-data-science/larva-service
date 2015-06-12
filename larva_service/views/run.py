@@ -2,12 +2,14 @@ import os
 import json
 from urlparse import urlparse
 
+import requests
+
 from rq import cancel_job
 from pymongo import DESCENDING
 from flask import render_template, redirect, url_for, request, flash, jsonify, send_file, abort
 
 
-from larva_service import app, db, run_queue, redis_connection
+from larva_service import app, db, run_queue, redis_connection, cache
 from larva_service.models import remove_mongo_keys
 from larva_service.models.run import Run
 
@@ -16,7 +18,7 @@ from larva_service.tasks.local import run as local_run
 from larva_service.tasks.distributed import run as distributed_run
 
 from flask_wtf import Form
-from wtforms.fields import StringField, RadioField, TextAreaField
+from wtforms.fields import StringField, RadioField, TextAreaField, SelectField
 from wtforms.fields.html5 import URLField, DateField, IntegerField, DecimalField, EmailField
 from wtforms.validators import DataRequired, url, Email, NumberRange, Optional, InputRequired
 
@@ -33,7 +35,7 @@ def shoreline_choices():
 
 class RunForm(Form):
     name             = StringField('Name', validators=[ DataRequired() ], description='A unique and human readable name for this run, ie. "Montague Island 2006 - PWS Hindcast"')
-    behavior         = URLField('Behavior', validators=[ Optional(), url() ], description='URL to JSON Behavior file.  See http://behavior.larvamap.axiomdatascience.com/')
+    behavior         = SelectField('Behavior', validators=[ Optional() ])
     particles        = IntegerField('Particles', validators=[ NumberRange(min=1, max=200, message="Must be between 1 and 200.") ], description="The number of particles to force")
     dataset          = RadioField('Hydro model', validators=[ DataRequired() ], choices=dataset_choices())
     geometry         = TextAreaField('Starting position', validators=[ DataRequired() ], description="Point or Polygon geometry as a WKT string. Create using http://arthur-e.github.io/Wicket/sandbox-gmaps3.html.")
@@ -101,7 +103,19 @@ def run_larva_model(format=None):
 @app.route('/submit', methods=['GET', 'POST'])
 def submit():
 
+    def behavior_choices():
+        bh_root = app.config.get('BEHAVIOR_ROOT')
+        if cache.get('behavior_list'):
+            return cache.get('behavior_list')
+        bh = requests.get('{}/library.json'.format(bh_root)).json()
+        behavior_list = [ ('{}/library/{}.json'.format(bh_root, j['_id']), '{} - {}'.format(j['user'], j['name'])) for j in bh['results'] ]
+        behavior_list = sorted(behavior_list, key=lambda x: x[1])
+        behavior_list.insert(0, ('', 'None' ))
+        cache.set('behavior_list', behavior_list)
+        return behavior_list
+
     form = RunForm()
+    form.behavior.choices = behavior_choices()
 
     if not form.validate_on_submit():
         return render_template('submit.html', form=form)

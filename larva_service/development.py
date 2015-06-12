@@ -1,2 +1,4 @@
 DEBUG = True
 LOG_FILE = True
+
+CACHE_DEFAULT_TIMEOUT = 3600  # 1 hour

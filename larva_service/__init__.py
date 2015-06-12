@@ -47,6 +47,9 @@ shoreline_queue  = Queue('shorelines', connection=redis_connection, default_time
 # Create the database connection
 db = MongoKit(app)
 
+from flask.ext.cache import Cache
+cache = Cache(app)
+
 
 # Create datetime jinja2 filter
 def datetimeformat(value, format='%a, %b %d %Y at %I:%M%p'):

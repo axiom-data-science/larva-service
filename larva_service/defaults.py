@@ -38,3 +38,8 @@ REDIS_DB = url.path[1:]
 
 # Redis Results
 RESULTS_REDIS_URI = os.environ.get('RESULTS_REDIS_URI')
+
+BEHAVIOR_ROOT = 'http://behavior.larvamap.axiomdatascience.com'
+
+CACHE_TYPE = 'simple'
+CACHE_DEFAULT_TIMEOUT = 3600  # 1 hour
